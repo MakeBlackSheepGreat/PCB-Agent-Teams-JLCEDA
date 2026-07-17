@@ -1,0 +1,1 @@
+共享元件库目录。内容（symbol/footprint/3D/datasheet/README/CONVENTIONS）为本地工作数据，不入 git；由 component-preparing 按需写入。

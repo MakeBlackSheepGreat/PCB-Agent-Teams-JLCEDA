@@ -1,0 +1,52 @@
+# {{name}} — STATUS
+
+> live state；决策见 `CLAUDE.md`（静态）；决定理由见 `_artifacts/decisions/`（按需建）
+> 最后更新：{{date}}
+
+## 阶段进度
+
+| Phase | 状态 | 完成日期 | 关键 artifact |
+|---|---|---|---|
+| 0 骨架 | ✅ | {{date}} | 本目录 + `CLAUDE.md` 模板 + `STATUS.md` + `.gitignore`（project-init 产出）|
+| 1 拓扑 | ⛔ | — | `CLAUDE.md` §1-9（待 circuit-design 填）|
+| 2 选品 | ⛔ | — | `_artifacts/component_selecting/<role>_shortlist.json` |
+| 2.5 落资产 | ⛔ | — | `docs/bom.md` + `lib_external/...` + `.bom_readiness.json` sentinel |
+| 3 sch 生成 | ⛔ | — | `kicad/{{name}}.kicad_sch` |
+| 3.5 sch 检查 | ⛔ | — | `analysis/<run_id>/schematic.json` |
+| 4 pcb 生成 | ⛔ | — | `kicad/{{name}}.kicad_pcb` |
+| 4.5 pcb 检查 | ⛔ | — | `analysis/<run_id>/pcb.json` |
+| 5 release | ⛔ | — | `release/<ts>/release_<ts>.zip` |
+
+## 当前 blocker
+
+- 等用户进 Phase 1（circuit-design）讨论电路结构
+
+## 已产出 artifact 索引
+
+- ✅ `CLAUDE.md` 模板（{{date}}，待 Phase 1 填实）
+- ✅ `STATUS.md` 本文件（{{date}}）
+- ✅ `.gitignore`
+
+## Change log（append-only，含回退）
+
+- **{{date}}**：Phase 0 — project-init 创建骨架（5 子目录 + .gitignore + CLAUDE.md 模板 + 本文件）
+
+## 图例
+
+| 符号 | 含义 |
+|---|---|
+| ✅ | done — phase 完成 + gate 通过 |
+| 🟡 | in progress |
+| ⛔ | pending — 还没开始 |
+| ⚠ | stale — 上游改了，需重跑 |
+| 🔄 | redoing — 用户回退中 |
+
+## 回退处理 cheat sheet
+
+用户喊 "Phase X 回退" 时按以下处理：
+
+1. Phase X 当前行 append 一行 🔄 redoing（**不删历史**）
+2. Phase X+1, X+2, ... 所有 ✅ 改成 ⚠ stale
+3. 关联 sentinel 文件由下次 skill 跑时覆盖
+4. 已存在的 .kicad_sch / .kicad_pcb 让 user 决定 git restore 还是覆盖
+5. 在 Change log 新加一行说明回退原因

@@ -1,0 +1,92 @@
+# {{ project }} — 下单指南
+> 生成于 {{ generated_at }} · release_id: {{ release_id }}
+> 本目录是「准备下单」的总包。所有文件已就绪，按下面任一 Path 操作即可。
+
+---
+
+## 板子状态摘要
+| 项 | 值 |
+|---|---|
+| 板厚 / 层数 | {{ board.thickness_mm }} mm / {{ board.layers }} layers |
+| 板尺寸 | {{ board.size_mm }} |
+| 元件数 | {{ board.n_components }}（其中 SMT {{ board.n_smt }}，THT {{ board.n_tht }}） |
+| 唯一 MPN 数 | {{ coverage.n_unique_mpn }} |
+| Gerber 文件 ✓ | pcb_fab/{{ project }}_fab.zip |
+| 生产 BOM ✓ | pcb_fab/assembly_bom.csv |
+| 采购 BOM ✓ | procurement/bom_{{ project }}.csv |
+| check-pcb gate | {{ gate.status }} @ {{ gate.timestamp }} |
+
+---
+
+## 用户下单偏好（Phase 2 已问，本次直接用）
+
+| 轴 | 选项 |
+|---|---|
+| 渠道 | {% if user_intent.channel == "lcsc_jlcpcb" %}**LCSC 拼 JLCPCB 便宜单**（10–14 天，省 5–10×）→ ★ Path A{% elif user_intent.channel == "jp_domestic_fast" %}**日本仓快速**（DK JP / Mouser JP，3–5 天）→ ★ Path C-1 / C-2{% else %}**自动选最便宜 lane**（按 coverage_scan 算法）{% endif %} |
+| 品牌 | {{ user_intent.brand }} |
+| 价格 vs 库存 | {{ user_intent.price_vs_stock }} |
+| 黑名单 MPN | {% if user_intent.blacklist_mpns %}{{ user_intent.blacklist_mpns | join(", ") }}{% else %}（无）{% endif %} |
+| 偏好录入时间 | {{ user_intent.asked_at }} |
+
+> 想换偏好：跑 `record_preferences.py` 重写 `_artifacts/component_selecting/user_preferences.json`，然后重跑 release。
+
+---
+
+## 下单 Path 选择
+
+{% if user_intent.channel == "lcsc_jlcpcb" %}**按你 Phase 2 的渠道偏好，优先走 Path A（JLCPCB 拼单）。**{% elif user_intent.channel == "jp_domestic_fast" %}**按你 Phase 2 的渠道偏好，优先走 Path C-1（DigiKey JP）或 C-2（Mouser JP）—— 哪条覆盖率更高就用哪条。**{% else %}**渠道偏好为"自动"，按 coverage_scan 推荐：{% if coverage.recommended_paths %}{{ coverage.recommended_paths | join(", ") }}{% else %}无单仓全覆盖，需 mix{% endif %}。**{% endif %}
+
+### Path A：JLCPCB 一站式（PCB + SMT 装配）{% if user_intent.channel == "lcsc_jlcpcb" %} ★ 你的首选{% endif %}
+**适合**：所有 SMT 元件都能在 LCSC 找到（覆盖率见 `coverage_matrix.md`）
+**当前覆盖率**：LCSC {{ coverage.single_vendor_coverage.lcsc }} {% if "lcsc" in coverage.recommended_paths %}✅ 推荐{% else %}⚠ 不全{% endif %}
+**步骤**：
+1. 浏览器打开 https://cart.jlcpcb.com/quote
+2. 上传 `pcb_fab/{{ project }}_fab.zip`
+3. 启用 "PCB Assembly"
+4. 上传生产 BOM：`pcb_fab/assembly_bom.csv`
+5. 上传 CPL：`pcb_fab/{{ project }}_positions.csv`
+6. 工艺参数：板厚 {{ board.thickness_mm }} mm / 铜厚 1 oz / 阻焊绿 / 丝印白（详见 `fab_options.md`）
+
+### Path B：PCBWay turnkey（PCB + 全球采购装配）
+**适合**：元件分散在 DigiKey/Mouser，LCSC 覆盖不全
+**步骤**：
+1. https://www.pcbway.com/orderonline.aspx
+2. 上传 `pcb_fab/{{ project }}_fab.zip`
+3. Quote Assembly → 上传 `procurement/bom_{{ project }}.csv`（PCBWay 接受全球 MPN）
+4. CPL：`pcb_fab/{{ project }}_positions.csv`
+
+### Path C：PCB 独打 + 元件自买（最便宜，但要自己焊）
+PCB 走 Path A 但**不勾装配**。元件按以下任一 distributor 下：
+
+#### C-1：DigiKey JP（覆盖率 {{ coverage.single_vendor_coverage.digikey_jp }}）{% if user_intent.channel == "jp_domestic_fast" %} ★ 你的首选{% elif "digikey_jp" in coverage.recommended_paths %} ✅ 推荐{% endif %}
+1. 打开 https://www.digikey.jp/en/mylists/list/bulk-add
+2. 上传 `procurement/digikey_bulk.csv`
+{% if "digikey_jp" not in coverage.recommended_paths %}3. 缺件需走 Mouser 或 LCSC 补（详见 `coverage_matrix.md`）
+{% endif %}
+
+#### C-2：Mouser JP（覆盖率 {{ coverage.single_vendor_coverage.mouser_jp }}）{% if user_intent.channel == "jp_domestic_fast" %} ★ 你的首选{% elif "mouser_jp" in coverage.recommended_paths %} ✅ 推荐{% endif %}
+1. 打开 https://www.mouser.jp/Bom/
+2. 上传 `procurement/mouser_bom.csv`
+
+#### C-3：LCSC（覆盖率 {{ coverage.single_vendor_coverage.lcsc }}）{% if "lcsc" in coverage.recommended_paths %} ✅ 推荐{% endif %}
+1. 打开 https://www.lcsc.com/bom
+2. 上传 `procurement/lcsc_bom.csv`
+3. 注意国际运费
+
+---
+
+## 文件夹完整索引
+- `pcb_fab/` — 给 fab 厂用：Gerber/Drill/CPL/生产 BOM
+- `procurement/` — 给 distributor 用：采购 BOM + 各家上传格式 CSV
+- `datasheets/` — 所有 MPN 的数据手册（焊接 / debug 时查 pin 用）
+- `docs/` — kidoc 产出的 HDD / Manufacturing Transfer Pack
+- `coverage_matrix.md` — 各 distributor 库存覆盖率明细
+- `fab_options.md` — JLCPCB vs PCBWay 工艺对比
+- `release_{{ release_id }}.zip` — 总包，发邮件 / 转给同事用这个
+
+---
+
+## 红线
+- ❌ 不要直接给 fab 厂源工程目录里的 `.kicad_pcb` / `.kicad_sch` —— 用 `pcb_fab/` 下的 zip
+- ❌ 板子没过 check-pcb gate 不要进 release（本指南只在 gate pass 后生成）
+- ❌ MPN 替换后必须重跑 release（不要只手改 csv）

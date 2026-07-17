@@ -1,0 +1,7 @@
+{
+  "schema_version": "phase2.5_v1",
+  "mpn": "RC0805FR-07100RL",
+  "manufacturer": "Yageo",
+  "verdict": "pass",
+  "datasheet": {"path": "tests/fixtures/sample_project/datasheets/RC0805FR-07100RL.pdf"}
+}

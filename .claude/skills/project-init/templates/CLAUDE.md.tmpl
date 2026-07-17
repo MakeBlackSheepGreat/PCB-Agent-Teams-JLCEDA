@@ -1,0 +1,118 @@
+# {{name}} — (项目副标题，1 行)
+
+{{goal}}
+
+> **通用规则**（MCU 平台、电源域、差分链等）见工作区 `../../CLAUDE.md`，本文件只写本项目专属内容。
+> **创建日期**：{{date}}
+
+---
+
+## 1. 项目目标
+
+(1-2 句话说清楚要做什么、给谁用、解决什么问题)
+
+- 目标 1
+- 目标 2
+
+---
+
+## 2. 技术参数表
+
+| 项目 | 指标 | 备注 |
+|------|------|------|
+| 输入范围 | — | |
+| 输出范围 | — | |
+| 精度 | — | |
+| 隔离等级 | — | |
+| 采样率 | — | |
+| 工作温度 | — | |
+
+---
+
+## 3. 完整原理图（v0.1）
+
+```
+(circuit-design 完成后用 ASCII art 画完整拓扑。draw-schematic L3 拓扑层会用它对照)
+
+┌─── 输入 ───┐         ┌─── 处理 ───┐         ┌─── 输出 ───┐
+│            │         │            │         │            │
+│            ├────────►│            ├────────►│            │
+│            │         │            │         │            │
+└────────────┘         └────────────┘         └────────────┘
+```
+
+---
+
+## 4. 接口定义
+
+### J_X — (端子 1 名称)
+
+| Pin | 信号 | 接 |
+|-----|------|---|
+| 1 | — | — |
+
+### J_Y — (端子 2 名称)
+
+(每个连接器/排针都列 pin 含义)
+
+---
+
+## 5. BOM + spec 冻结表 v0.1
+
+> circuit-design 落盘时填这张表（三态）。完整格式 / 三态判据 → `circuit-design/references/claude_md_template.md`。
+
+| role | 元件角色 | 目标 spec（硬值 / 范围 / TBD:原因） | 已有件 MPN | 状态 |
+|------|---------|-----------------------------------|-----------|------|
+| iso_amp | 隔离放大器 | — | — | spec_frozen |
+| hv_div_top | HV 分压上臂 | — | — | spec_frozen |
+| c_in_np0 | 输入 NP0 电容 | — | — | spec_frozen |
+| hv_terminal | HV 螺丝端子 | — | — | spec_frozen |
+
+> 状态三态：`locked`（已有件 MPN 钉死）/ `spec_frozen`（spec 冻好待选）/ `TBD`（spec 缺，**带原因+归属**）。spec cell 不留裸空格。
+> 冻结后由 `component-preparing` 抓资产 + 出 BOM 验收 sentinel → 通过后才能 draw-schematic。
+
+---
+
+## 6. 关键参数验算
+
+```
+分压比 / 滤波 Fc / 功耗 / CPU 占用 等
+```
+
+---
+
+## 7. 安规布局 checklist（PCB 阶段对照）
+
+- [ ] HV/LV 隔离槽 ≥1.5mm 宽（有高压时）
+- [ ] 爬电距离 ≥8mm
+- [ ] 电气间隙 ≥2mm
+- [ ] 走线宽度 ≥0.5mm（高压）
+- [ ] 差分对长度匹配 ≤5mm
+- [ ] 去耦电容紧贴 IC 引脚 ≤2mm
+
+---
+
+## 8. 设计哲学
+
+(说清楚关键的设计取舍 — 例如 "硬件透明 + 软件全控"、"只用基础元件"、"成本优先" 等)
+
+---
+
+## 9. 未决问题
+
+- [ ] (列出还没定的事)
+- [ ] PCB 尺寸目标
+- [ ] 测试点位置
+
+---
+
+## 下一步
+
+1. **Phase 1** — 用 `circuit-design` 跟用户讨论电路结构（拓扑 / 锚点件 / 周边）
+2. **Phase 2** — 用 `component-selecting-JP`（按 USER.md §0 locale 路由）出 shortlist
+3. **Phase 2.5** — 用 `component-preparing` 落资产（datasheet + library + evidence）+ 写 BOM sentinel + 采购 BOM CSV
+4. **Phase 3** — 用 `draw-schematic` 写 `.py` → 生成 .kicad_sch + ERC clean（生成 gate）
+5. **Phase 3.5** — 用 `check-schematic` 做 sch 单侧检查 + SPICE 仿真 + design review
+6. **Phase 4** — 用 `draw-pcb` 生成 PCB + DRC clean（生成 gate）
+7. **Phase 4.5** — 用 `check-pcb` 做 DRC + EMC + thermal + sch↔pcb 跨域 + parasitic SPICE
+8. **Phase 5** — 用 `release` umbrella 一条命令出 Gerber + 生产 BOM + 文档 PDF（HDD/CE/Design Review/ICD）+ vendor 决策（JLCPCB vs PCBWay）+ distributor CSV + ORDER_GUIDE + release_<ts>.zip

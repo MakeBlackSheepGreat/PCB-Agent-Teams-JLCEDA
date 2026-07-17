@@ -1,0 +1,43 @@
+{
+  "verified_at": "2026-05-08T00:00:00Z",
+  "py_file": "tests/fixtures/sample_project/sample_project.py",
+  "py_mtime": 0,
+  "skip_stock": true,
+  "audit_mode": false,
+  "components": [
+    {
+      "ref": "U1",
+      "mpn": "TLV70033DDCR",
+      "py_symbol": "Regulator_Linear:TLV70033DDCR",
+      "footprint": "Package_TO_SOT_SMD:SOT-23-5",
+      "category": "ic",
+      "datasheet_ok": true,
+      "datasheet": "tests/fixtures/sample_project/datasheets/TLV70033DDCR.pdf",
+      "issues": [],
+      "actions": []
+    },
+    {
+      "ref": "R1",
+      "mpn": "10k",
+      "py_symbol": "Device:R",
+      "footprint": "Resistor_SMD:R_0805_2012Metric",
+      "category": "generic",
+      "datasheet_ok": true,
+      "datasheet": null,
+      "issues": [],
+      "actions": []
+    },
+    {
+      "ref": "R2",
+      "mpn": "100R",
+      "py_symbol": "Device:R",
+      "footprint": "Resistor_SMD:R_0805_2012Metric",
+      "category": "connector",
+      "datasheet_ok": true,
+      "datasheet": "tests/fixtures/sample_project/datasheets/RC0805FR-07100RL.pdf",
+      "issues": [],
+      "actions": []
+    }
+  ],
+  "summary": {"all_pass": true}
+}

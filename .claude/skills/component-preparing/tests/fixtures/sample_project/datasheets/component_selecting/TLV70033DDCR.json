@@ -1,0 +1,7 @@
+{
+  "schema_version": "phase2.5_v1",
+  "mpn": "TLV70033DDCR",
+  "manufacturer": "Texas Instruments",
+  "verdict": "pass",
+  "datasheet": {"path": "tests/fixtures/sample_project/datasheets/TLV70033DDCR.pdf"}
+}

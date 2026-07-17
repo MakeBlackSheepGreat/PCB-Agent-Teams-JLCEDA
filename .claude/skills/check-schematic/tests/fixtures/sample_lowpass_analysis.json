@@ -1,0 +1,20 @@
+{
+  "_comment": "Minimal analyzer-output fixture for aa_filter_sim regression test. Contains 1 single-ended low-pass (R + C-to-GND) and 1 differential (R/R/C-diff) topology, with hierarchical UUID-prefixed nets to exercise net coalescing. Expected aa_filter_sim output: 2 candidates, 2 pass at fc=15.92kHz analytic.",
+  "components": [
+    {"reference": "R1", "value": "1k", "type": "resistor", "footprint": "Resistor_SMD:R_0805_2012Metric"},
+    {"reference": "R2", "value": "100", "type": "resistor", "footprint": "Resistor_SMD:R_0805_2012Metric"},
+    {"reference": "R3", "value": "100", "type": "resistor", "footprint": "Resistor_SMD:R_0805_2012Metric"},
+    {"reference": "C1", "value": "10nF", "type": "capacitor", "footprint": "Capacitor_SMD:C_0805_2012Metric"},
+    {"reference": "C2", "value": "100nF", "type": "capacitor", "footprint": "Capacitor_SMD:C_0805_2012Metric"}
+  ],
+  "nets": {
+    "VIN": {"pins": [{"component": "R1", "pin_number": "1"}]},
+    "/abcdef01-2345-6789-abcd-ef0123456789/SIGNAL": {"pins": [{"component": "R1", "pin_number": "2"}]},
+    "SIGNAL": {"pins": [{"component": "C1", "pin_number": "1"}]},
+    "GND": {"pins": [{"component": "C1", "pin_number": "2"}]},
+    "OUTP": {"pins": [{"component": "R2", "pin_number": "1"}]},
+    "OUTN": {"pins": [{"component": "R3", "pin_number": "1"}]},
+    "/abcdef01-2345-6789-abcd-ef0123456789/ADC_P": {"pins": [{"component": "R2", "pin_number": "2"}, {"component": "C2", "pin_number": "1"}]},
+    "/abcdef01-2345-6789-abcd-ef0123456789/ADC_N": {"pins": [{"component": "R3", "pin_number": "2"}, {"component": "C2", "pin_number": "2"}]}
+  }
+}

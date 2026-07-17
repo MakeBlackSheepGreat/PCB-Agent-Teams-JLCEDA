@@ -1,0 +1,34 @@
+# Direct dependencies only — transitive deps resolve via pip.
+# Audited 2026-07: every entry is imported / CLI-invoked by a skill script.
+
+# schematic generation + editing
+circuit_synth==0.12.1
+kicad-sch-api==0.5.6
+
+# component library fetch (LCSC part number -> KiCad symbol/footprint/3D)
+easyeda2kicad==1.0.1
+
+# distributor page probing + datasheet fetch (run `playwright install chromium` once)
+playwright==1.59.0
+
+# HTTP + config + misc
+requests==2.33.1
+charset-normalizer==3.4.7
+PyYAML==6.0.3
+psutil==7.2.2
+
+# geometry + rendering (placement / routing / figures)
+numpy==2.4.4
+scipy==1.17.1
+shapely==2.1.2
+matplotlib==3.10.9
+pillow==12.2.0
+
+# release document generation (PDF / ODT / DOCX / order guide)
+reportlab==4.4.10
+odfpy==1.4.1
+python-docx==1.2.0
+Jinja2==3.1.6
+
+# tests
+pytest==9.0.3

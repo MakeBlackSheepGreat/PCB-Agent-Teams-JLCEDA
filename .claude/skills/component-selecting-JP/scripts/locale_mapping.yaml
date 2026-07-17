@@ -1,0 +1,248 @@
+# Locale → Vendor 优先级映射表
+#
+# 给 component-selecting-JP skill 用：根据 USER.md §0 的"所属地"字段，
+# 决定该 user 的本土仓优先级 + 搜索 URL 模板 + 库存阈值 + 货币。
+#
+# 新增国家：在 locales 下加新条目，aliases 列出该国家的常见写法（中英日缩写）。
+# 不要在 SKILL.md / Python 脚本里硬编码任何国家名。
+#
+# 字段说明：
+#   aliases             - 匹配 USER.md §0 的字符串变体
+#   vendors_priority    - 跑查询的顺序（前面的优先）
+#   vendors.<id>.search_url - {mpn} 占位符，调用方 .format(mpn=MPN)
+#   vendors.<id>.notes  - 给 LLM 提示的 vendor 特点（如"NRND 标在哪里"）
+#   stock_threshold     - 库存阈值，short_term=单板验证，long_term=复购场景
+#   currency            - 该 locale 的主流报价货币
+#   pcb_fab             - 该 locale 推荐的 PCB 打样厂（多数情况都是 JLCPCB 性价比）
+#
+#   library_fetch_strategy  - 选品时 library 数据源 + 路由策略（enum）：
+#                              lcsc_easyeda       中国大陆默认；download_lcsc_lib.py + easyeda2kicad
+#                              digikey_jp_browser 日本默认；agent-browser headless 走 dkjp 持久 session
+#                                                  打开 digikey.jp/en/models/<dk_id>，scrape 文字标记
+#                                                  Symbol/Footprint/3D Model 是否 "Download Now"
+#                              fallback_chain     其它 locale；按 chain 顺序尝试 lcsc → ultra_librarian
+#   library_fetch_config    - 策略参数（具体字段按 strategy 不同；缺字段默认值见 _load_yaml_simple post-process）
+#                              session_name             agent-browser 持久 session 名（仅 digikey_jp_browser）
+#                              models_url_template      DigiKey models 页 URL 模板（含 {dk_part_id} 占位）
+#                              probe_text_markers       页面 body 文字 markers，用 substring 匹配检测三件齐
+#                              probe_timeout_sec        单候选探测超时（默认 12s）
+#                              chain                    fallback_chain 的尝试顺序（list of strategy ids）
+#                              verify_command, verify_flag, full_flag  lcsc_easyeda 用
+
+locales:
+
+  # ─────────────────────────────── 日本 ───────────────────────────────
+  日本:
+    aliases: [japan, jp, JP, Japan, JAPAN, 日本, にほん]
+    currency: JPY
+    pcb_fab: JLCPCB  # 工作区 CLAUDE.md 已固化（5 枚 + DHL 4-5 天到日本，~$30）
+    stock_threshold:
+      short_term: 10
+      long_term: 50
+    digikey_api:
+      site: JP        # X-DIGIKEY-Locale-Site
+      lang: ja        # X-DIGIKEY-Locale-Language
+      currency: JPY   # X-DIGIKEY-Locale-Currency
+    library_fetch_strategy: digikey_jp_browser
+    library_fetch_config:
+      session_name: dkjp
+      models_url_template: "https://www.digikey.jp/en/models/{dk_part_id}"
+      # Markers based on real DigiKey JP /en/models/<id> body text (verified 2026-04-29):
+      #   Library-complete part:   body has "Symbol" + "Footprint" + "3D Model" headers ONLY
+      #   Library-partial part:    body adds "This symbol is currently not available" /
+      #                            "This footprint is currently not available"
+      # We detect ABSENCE via the explicit "currently not available" sentinel; presence = !absent.
+      probe_text_markers:
+        symbol_absent:     "This symbol is currently not available"
+        footprint_absent:  "This footprint is currently not available"
+        model_3d_absent:   "This 3D model is currently not available"
+        # If body lacks anchor at all, the part isn't on UL — treat all 3 as absent
+        page_load_marker:  "Footprints and Models"
+      ultra_librarian_anchor_text: "View on Ultra Librarian"
+      probe_timeout_sec: 30
+      headed_first_run_only: true
+      requires_oauth: true
+      blocked_when_headless_no_session: true
+    vendors_priority:
+      - digikey_jp
+      - mouser_jp
+      - lcsc            # JLCPCB 拼单 lane：和 PCB 打样一起 DHL 到日本
+      - akizuki         # optional: only with --include-html-vendors
+      - marutsu         # optional: only with --include-html-vendors
+      - chip1stop
+      - rs_jp
+    vendors:
+      akizuki:
+        name: 秋月電子通商
+        search_url: "https://akizukidenshi.com/catalog/goods/search.aspx?keyword={mpn}"
+        notes: "在地最便宜，但 SKU 有限；若 hit，状态字段无 NRND 概念，看库存数即可"
+      marutsu:
+        name: マルツ Marutsu
+        search_url: "https://www.marutsu.co.jp/pc/ic/searchEngine?searchWord={mpn}"
+        notes: "比秋月广，本土仓；某些 MPN 搜索会返回 404 而非空结果页"
+      digikey_jp:
+        name: DigiKey Japan
+        search_url: "https://www.digikey.jp/ja/products/result?keywords={mpn}"
+        product_status_field: "部品ステータス / Part Status"
+        nrnd_marker: "新規設計向けに不適合"
+        notes: "全球品类最广；ProductStatus 必须是 アクティブ/Active；NRND/廃止/Obsolete 一票否决"
+      mouser_jp:
+        name: Mouser Japan
+        search_url: "https://www.mouser.jp/c/?q={mpn}"
+        notes: "API 兜底备用；Mouser US 库存能海运到日本但有税"
+      lcsc:
+        name: LCSC（JLCPCB 拼单）
+        search_url: "https://www.lcsc.com/products/search?keyword={mpn}"
+        notes: "中国仓；和 JLCPCB PCB 打样一起 DHL 到日本（~$30 + 元件费 + 5 天）。jlcsearch 主 + wmsc 兜底，无 NRND 概念，看 stockNumber 即可"
+      chip1stop:
+        name: Chip1Stop
+        search_url: "https://www.chip1stop.com/sp/products/search?part={mpn}"
+        notes: "日系强；常超时，记 timeout 不算 fail"
+      rs_jp:
+        name: RS Components Japan
+        search_url: "https://jp.rs-online.com/web/c/?searchTerm={mpn}"
+        notes: "工业件强，IC 一般"
+
+  # ─────────────────────────────── 美国 ───────────────────────────────
+  美国:
+    aliases: [usa, us, US, USA, "United States", "United States of America", america, アメリカ]
+    currency: USD
+    pcb_fab: JLCPCB
+    stock_threshold:
+      short_term: 10
+      long_term: 50
+    digikey_api:
+      site: US
+      lang: en
+      currency: USD
+    library_fetch_strategy: fallback_chain
+    library_fetch_config:
+      chain: [lcsc_easyeda, ultra_librarian]
+      probe_timeout_sec: 12
+    vendors_priority:
+      - digikey_us
+      - mouser_us
+      - newark
+      - arrow
+    vendors:
+      digikey_us:
+        name: DigiKey US
+        search_url: "https://www.digikey.com/en/products/result?keywords={mpn}"
+        product_status_field: "Product Status"
+        nrnd_marker: "Not For New Designs"
+        notes: "ProductStatus 必须 Active；NRND/Obsolete 一票否决"
+      mouser_us:
+        name: Mouser US
+        search_url: "https://www.mouser.com/c/?q={mpn}"
+      newark:
+        name: Newark / Element14
+        search_url: "https://www.newark.com/searchref/{mpn}"
+      arrow:
+        name: Arrow
+        search_url: "https://www.arrow.com/en/products/search?q={mpn}"
+
+  # ─────────────────────────────── 欧盟 ───────────────────────────────
+  欧盟:
+    aliases: [eu, EU, european_union, europe, europa, ヨーロッパ, deutschland, germany, france, italy, spain]
+    currency: EUR
+    pcb_fab: JLCPCB
+    stock_threshold:
+      short_term: 10
+      long_term: 50
+    digikey_api:
+      site: DE        # DigiKey Germany 作为 EU 主仓
+      lang: en
+      currency: EUR
+    library_fetch_strategy: fallback_chain
+    library_fetch_config:
+      chain: [lcsc_easyeda, ultra_librarian]
+      probe_timeout_sec: 12
+    vendors_priority:
+      - mouser_eu
+      - rs_eu
+      - farnell
+      - reichelt
+      - tme
+    vendors:
+      mouser_eu:
+        name: Mouser EU
+        search_url: "https://eu.mouser.com/c/?q={mpn}"
+      rs_eu:
+        name: RS Components EU
+        search_url: "https://uk.rs-online.com/web/c/?searchTerm={mpn}"
+      farnell:
+        name: Farnell
+        search_url: "https://www.farnell.com/searchref/{mpn}"
+      reichelt:
+        name: Reichelt
+        search_url: "https://www.reichelt.com/index.html?ACTION=446&LA=0&q={mpn}"
+        notes: "德国本土最便宜，但 SKU 有限"
+      tme:
+        name: TME
+        search_url: "https://www.tme.eu/en/katalog/?search={mpn}"
+
+  # ─────────────────────────────── 中国大陆 ─────────────────────────────
+  中国大陆:
+    aliases: [china, cn, CN, mainland_china, 中国, 中国大陆, prc]
+    currency: CNY
+    pcb_fab: JLCPCB
+    stock_threshold:
+      short_term: 10
+      long_term: 50
+    digikey_api:
+      # DigiKey China site is paywalled / partial; use US endpoint with USD pricing
+      # for parametric discovery, then user falls back to local LCSC for actual order.
+      site: US
+      lang: en
+      currency: USD
+    library_fetch_strategy: lcsc_easyeda
+    library_fetch_config:
+      verify_command: ".claude/skills/draw-schematic/scripts/download_lcsc_lib.py"
+      verify_flag: "--verify-only"
+      full_flag: "--full"
+      probe_timeout_sec: 30
+    vendors_priority:
+      - lcsc
+      - szlcsc
+      - taobao
+    vendors:
+      lcsc:
+        name: LCSC 立创商城
+        search_url: "https://www.lcsc.com/products/search?keyword={mpn}"
+        notes: "用 fetch_datasheet_lcsc.py:search_lcsc() 拿结构化数据"
+      szlcsc:
+        name: 立创商城（中文）
+        search_url: "https://list.szlcsc.com/catalog/?k={mpn}"
+      taobao:
+        name: 淘宝（兜底）
+        search_url: "https://s.taobao.com/search?q={mpn}"
+        notes: "无 active 状态概念，只能粗判是否有卖家"
+
+  # ─────────────────────────────── 默认（未匹配 fallback）───────────────
+  unknown:
+    aliases: [unknown, "[待填]", ""]
+    currency: USD
+    pcb_fab: JLCPCB
+    stock_threshold:
+      short_term: 10
+      long_term: 50
+    digikey_api:
+      site: US
+      lang: en
+      currency: USD
+    library_fetch_strategy: fallback_chain
+    library_fetch_config:
+      chain: [lcsc_easyeda, ultra_librarian]
+      probe_timeout_sec: 12
+    vendors_priority:
+      - digikey_us
+      - mouser_us
+      - lcsc
+    vendors:
+      digikey_us:
+        search_url: "https://www.digikey.com/en/products/result?keywords={mpn}"
+      mouser_us:
+        search_url: "https://www.mouser.com/c/?q={mpn}"
+      lcsc:
+        search_url: "https://www.lcsc.com/products/search?keyword={mpn}"
+    notes: "USER.md §0 未填或无法匹配；用 DigiKey US + LCSC 兜底，提示用户填 USER.md"

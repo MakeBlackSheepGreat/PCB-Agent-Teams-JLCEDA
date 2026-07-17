@@ -1,0 +1,38 @@
+{%- macro cell(c) -%}
+{%- if c.active -%}
+✓ {{ c.stock }}
+{%- if c.price is not none %} / {% if c.currency == "JPY" %}¥{{ c.price }}{% else %}{{ c.price }} {{ c.currency }}{% endif %}{% endif -%}
+{%- if c.is_primary %} ★{% endif -%}
+{%- else -%}
+— {{ c.note }}
+{%- endif -%}
+{%- endmacro -%}
+# Distributor 覆盖率矩阵
+> 生成于 {{ generated_at }}
+> 数据源：{% if coverage.data_source == "all-lane" %}`Projects/{{ project }}/_artifacts/component_selecting/*_shortlist.json`（**全 lane 实测**：DK_JP + Mouser_JP + LCSC 三条都查过）{% elif coverage.data_source == "primary-only" %}`Projects/{{ project }}/datasheets/component_selecting/*.json`（**仅 primary winner**——artifact shortlist 缺失，非 primary 的 lane 标 "no evidence"，不代表真无货）{% else %}（无数据）{% endif %}
+
+## 单 vendor 全覆盖
+
+| Vendor | 覆盖率 | 推荐 |
+|---|---|---|
+| DigiKey JP | {{ coverage.single_vendor_coverage.digikey_jp }} | {% if "digikey_jp" in coverage.recommended_paths %}✅{% else %}—{% endif %} |
+| Mouser JP | {{ coverage.single_vendor_coverage.mouser_jp }} | {% if "mouser_jp" in coverage.recommended_paths %}✅{% else %}—{% endif %} |
+| LCSC | {{ coverage.single_vendor_coverage.lcsc }} | {% if "lcsc" in coverage.recommended_paths %}✅{% else %}—{% endif %} |
+
+{% if coverage.data_source == "all-lane" -%}
+> 覆盖率 = "该 vendor 实测 active（exact MPN match + 有库存）" 的 MPN 数 / 总 MPN 数。
+> "probed but inactive" = lane 查过但该 MPN 在该 vendor 不存在或停产；"no evidence" 仅在 artifact shortlist 缺该 MPN 时出现（罕见）。
+{%- elif coverage.data_source == "primary-only" -%}
+> ⚠ artifact shortlist 缺失，覆盖率仅反映**被选作 primary 的次数**，非真实库存覆盖。
+> 重跑 component-selecting-JP（保留 `_artifacts/`）后 release 会自动切到 all-lane 视图。
+{%- endif %}
+
+## 详细矩阵
+
+| MPN | Qty | Refs | DigiKey JP | Mouser JP | LCSC |
+|---|---|---|---|---|---|
+{% for row in coverage.matrix -%}
+| `{{ row.mpn }}` | {{ row.qty }} | {{ row.refs }} | {{ cell(row.digikey_jp) }} | {{ cell(row.mouser_jp) }} | {{ cell(row.lcsc) }} |
+{% endfor %}
+
+> ★ = component-preparing 选定的 primary winner（写进 `phase2.5_v1` evidence）

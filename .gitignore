@@ -1,0 +1,75 @@
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+secrets.env
+*.secret
+
+# Personal profile — every user keeps their own. Template is USER.md.example.
+USER.md
+!USER.md.example
+
+# Workspace rebuild prompt pack — contains literal API keys + full code byte-dump.
+# Pure-text local handbook; never commit / never push.
+项目搭建提示词/
+
+# DigiKey OAuth token cache
+.digikey_token*
+
+# OS
+.DS_Store
+__MACOSX/
+
+# Python / local tooling
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Compiled artifacts — host/arch specific. Rebuild the Rust router from source
+# with draw-pcb/.../KiCadRoutingTools/build_router.py.
+*.so
+*.pyd
+*.dylib
+target/
+
+# Local archive of project-unrelated material (promo decks, test project, dev notes)
+_archive/
+
+# Generated boards — project-init scaffolds these locally; never commit.
+# Keep the empty folder via .gitkeep so the documented structure survives.
+Projects/*
+!Projects/.gitkeep
+
+# Logs and temporary output
+logs/*
+!logs/.gitkeep
+*.log
+
+# Shared component library — local working data; only the folder + write rules are tracked.
+lib_external/*
+!lib_external/.gitkeep
+!lib_external/CONVENTIONS.md
+
+# Local docs — not published.
+docs/
+
+# Archives and generated/binary reference payloads
+*.zip
+
+# Claude Code is the only supported agent entrypoint in this workspace.
+# Keep accidental Codex / Antigravity scaffolding out of the project.
+AGENTS.md
+.agents/
+.Codex/
+.antigravitycli/
+
+# .claude/skills + references ARE the project core — commit them.
+# Deprecated skills live in _archive/archived_skills/ (already ignored above).
+
+# External KiCad library clones (regenerate on demand, not in git)
+lib_cache/sources/
+
+# LCSC dry-run caches — machine-local, regenerated on demand
+lib_cache/lcsc_dryrun_cache/
+lib_cache/lcsc_dryrun_cache_v2/
