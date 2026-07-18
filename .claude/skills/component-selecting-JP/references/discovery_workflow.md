@@ -27,6 +27,7 @@
 目标 10 颗 MPN，按技术 spec **中立采样**——日系 / 欧美 / 国产都拉一些。
 偏好不参与 Discovery（中立采样 → user 临时换偏好不用重跑脚本）。
 
-## 已弃用：内置 `--discover`
+## 内置 `--discover`：关键件弃用，被动件可用
 
-`--discover` 模式（DK keyword search + LCSC fallback）覆盖窄，DK quota 一死就只剩 2-3 个 LCSC 候选。**优先用 LLM discovery + `--longlist`**。`--discover` 仅作为离线场景兜底保留。
+- **关键件（IC / 模块）**：`--discover` 的 DK keyword search 覆盖窄，DK quota 一死就只剩 2-3 个 LCSC 候选。**优先用 LLM discovery + `--longlist`**，`--discover` 仅作离线兜底。
+- **被动件（R/C/L/磁珠）**：免 key 参数化车道可用——`--discover --role resistor --param resistance=1000 --param package=0603`（jlcsearch 类型化端点）；电感/磁珠自动落 jlcparts 分片。LCSC 料经 JLCPCB 拼单顺路到日本，产物是 longlist，仍需回 `--longlist` 过三车道 buyable 验证。

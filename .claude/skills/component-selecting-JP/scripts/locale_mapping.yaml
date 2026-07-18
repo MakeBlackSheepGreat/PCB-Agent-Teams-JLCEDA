@@ -90,7 +90,9 @@ locales:
       rs_jp: jp_domestic
       lcsc: jlcpcb_consolidated
     fx_display: cny_jpy
-    discover_sources: [local, digikey, lcsc]
+    # lcsc_parametric / jlcparts：CN 免 key 参数海选车道，JP 同样可用——LCSC 料
+    # 经 JLCPCB 拼单顺路到日本，discover 只扩候选池，buyable gate 照旧三车道验证
+    discover_sources: [local, digikey, lcsc, lcsc_parametric, jlcparts]
     lcsc_attributes_as_parameters: "off"
     display:
       lane_order: [digikey_jp, mouser_jp, lcsc]
