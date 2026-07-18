@@ -32,6 +32,8 @@ PRICE_VS_STOCK_CHOICES = ("tight", "balanced", "stable_first")
 
 
 def prefs_path(project: str) -> Path:
+    if not project.strip() or "/" in project or "\\" in project or ".." in project:
+        raise SystemExit(f"❌ --project must be a bare directory name, got {project!r}")
     return (WORKSPACE_ROOT / "Projects" / project
             / "_artifacts" / "component_selecting"
             / "user_preferences.json")

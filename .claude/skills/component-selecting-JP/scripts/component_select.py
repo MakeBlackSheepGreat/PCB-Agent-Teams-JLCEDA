@@ -1113,18 +1113,6 @@ def load_yaml_simple(path: Path) -> dict[str, Any]:
     return parsed
 
 
-def _warn_caller_locale_mismatch(args: argparse.Namespace, locale_name: str) -> None:
-    """Mis-invocation hint: a locale thin shell driving a different locale is
-    almost always a USER.md §0 / --locale mistake. Warn, never fail."""
-    caller = getattr(args, "caller_skill", "component-selecting-JP")
-    if caller == "component-selecting-CN" and locale_name != "中国大陆":
-        print(
-            f"WARN caller-skill={caller} but resolved locale={locale_name}; "
-            "check USER.md §0 or pass --locale 中国大陆",
-            file=sys.stderr,
-        )
-
-
 def read_user_locale(user_md_path: Path) -> str | None:
     if not user_md_path.exists():
         return None
@@ -2801,7 +2789,11 @@ _GENERIC_PARAM_KEYWORDS = (
 )
 
 
-def _extract_key_params(vendor_results: list[dict[str, Any]], role: str | None) -> dict[str, str]:
+def _extract_key_params(
+    vendor_results: list[dict[str, Any]],
+    role: str | None,
+    locale_block: dict[str, Any] | None = None,
+) -> dict[str, str]:
     """Extract key electrical parameters from DigiKey API raw_parameters.
 
     Two-tier strategy:
@@ -2817,12 +2809,10 @@ def _extract_key_params(vendor_results: list[dict[str, Any]], role: str | None) 
     # Find a vendor result with raw_parameters (DigiKey API, or LCSC when the
     # locale opts into lcsc_attributes_as_parameters)
     raw_params: dict[str, str] = {}
-    raw_params_vendor = ""
     for v in vendor_results:
         rp = v.get("raw_parameters")
         if isinstance(rp, dict) and rp:
             raw_params = rp
-            raw_params_vendor = str(v.get("vendor_id") or "")
             break
     if not raw_params:
         return {}
@@ -2838,11 +2828,12 @@ def _extract_key_params(vendor_results: list[dict[str, Any]], role: str | None) 
 
     # Generic fallback: any param whose key contains a recognised keyword.
     # Cap at 16 entries to avoid bloating the JSON for parts with 60+ params.
-    # LCSC-sourced params get passive-term keywords on top — the DK-driven JP
-    # fallback output stays unchanged.
+    # Locales can extend the keyword set via yaml param_keywords_extra (the
+    # JP block omits it → DK-driven JP fallback output stays unchanged).
     keywords = _GENERIC_PARAM_KEYWORDS
-    if raw_params_vendor == "lcsc":
-        keywords = keywords + ("resistance", "capacitance", "inductance", "impedance", "tolerance", "esr")
+    extra_keywords = (locale_block or {}).get("param_keywords_extra")
+    if extra_keywords:
+        keywords = keywords + tuple(str(k) for k in extra_keywords)
     generic: dict[str, str] = {}
     for k, val in raw_params.items():
         if not val:
@@ -2959,7 +2950,7 @@ def evaluate_candidate(
     verdict, reasons = determine_verdict(buyable, lib_gate, solder)
 
     # Extract key parameters from DigiKey API vendor result
-    key_params = _extract_key_params(vendor_results, expected_role)
+    key_params = _extract_key_params(vendor_results, expected_role, locale_block)
 
     # Generic derating evaluation (advisory). Consumes any caller-supplied
     # `operating` block on the candidate + Abs-Max ratings from distributor
@@ -3217,6 +3208,8 @@ _JP_DISPLAY_DEFAULTS: dict[str, Any] = {
 
 
 def _display_config(locale_label: str | None) -> dict[str, Any]:
+    # Reload is once-per-run (render happens once inside write_payload, which
+    # has no locale context) — not worth threading locale_block through.
     cfg = dict(_JP_DISPLAY_DEFAULTS)
     try:
         mapping = load_yaml(LOCALE_MAPPING)
@@ -3240,7 +3233,10 @@ def _lane_cell(v: dict[str, Any] | None) -> str:
     price = v.get("price")
     stock = v.get("stock")
     nrnd_marker = " ⚠NRND" if status == "nrnd" else ""
-    if v.get("vendor_id") == "lcsc" and isinstance(v.get("price_jpy_estimated"), (int, float)):
+    # Currency-driven, not vendor-driven: any CNY lane (lcsc today, szlcsc via
+    # HTML path tomorrow) gets adaptive decimals instead of the generic ¥{:,.0f}
+    # that rounds ¥0.04 to ¥0. Only CNY rows ever carry price_jpy_estimated.
+    if isinstance(v.get("price_jpy_estimated"), (int, float)):
         jpy_est = v["price_jpy_estimated"]
         fx_warn = " ⚠fx" if v.get("fx_source") == "fallback" else ""
         # < ¥10 JPY → 1 decimal so user can compare e.g. ¥0.85 vs ¥4.9 vs ¥12.
@@ -3249,9 +3245,7 @@ def _lane_cell(v: dict[str, Any] | None) -> str:
             f"¥{price:.2f} CNY (≈¥{jpy_text} JPY, {_compact_int(stock)})"
             f"{nrnd_marker}{fx_warn}"
         )
-    if v.get("vendor_id") == "lcsc" and v.get("currency") == "CNY" and isinstance(price, (int, float)):
-        # fx_display: none locales — native CNY with adaptive decimals (generic
-        # ¥{:,.0f} would round ¥0.04 to ¥0; passives price in fractions of a fen).
+    if v.get("currency") == "CNY" and isinstance(price, (int, float)):
         cny_text = f"{price:.2f}" if price >= 0.1 else f"{price:.4f}"
         return f"¥{cny_text} CNY ({_compact_int(stock)}){nrnd_marker}"
     p = f"¥{price:,.0f}" if isinstance(price, (int, float)) else "—"
@@ -3373,13 +3367,14 @@ def _render_evaluation_summary(payload: dict[str, Any]) -> list[str]:
             )
 
         # Annotate any candidate with lcsc_only_active to clarify lane choice.
-        if str(display_cfg.get("emit_lane_flags", "jp")) == "jp":
-            lcsc_only = [it.get("mpn") for it in visible if it.get("lcsc_only_active")]
-            if lcsc_only:
-                lines.append("")
-                note_tmpl = str(display_cfg.get("lcsc_only_note") or _JP_DISPLAY_DEFAULTS["lcsc_only_note"])
-                for mpn in lcsc_only:
-                    lines.append(note_tmpl.format(mpn=mpn))
+        # (Locales with emit_lane_flags: none never carry the flag, so this
+        # self-suppresses — no second policy check needed here.)
+        lcsc_only = [it.get("mpn") for it in visible if it.get("lcsc_only_active")]
+        if lcsc_only:
+            lines.append("")
+            note_tmpl = str(display_cfg.get("lcsc_only_note") or _JP_DISPLAY_DEFAULTS["lcsc_only_note"])
+            for mpn in lcsc_only:
+                lines.append(note_tmpl.format(mpn=mpn))
 
         # Derating annotations (advisory). Only surface non-ok states so the
         # table stays clean. `warn` = operating point exceeds the generic
@@ -3415,7 +3410,6 @@ def run_evaluation(args: argparse.Namespace) -> int:
     mapping = load_yaml(LOCALE_MAPPING)
     locale_label = args.locale or read_user_locale(USER_MD)
     locale_name, locale_block = resolve_locale(locale_label, mapping)
-    _warn_caller_locale_mismatch(args, locale_name)
     if locale_name == "unknown" and not args.allow_unknown_locale:
         payload = {
             "status": "pending_user_input",
@@ -3578,7 +3572,6 @@ def run_discover(args: argparse.Namespace) -> int:
     mapping = load_yaml(LOCALE_MAPPING)
     locale_label = args.locale or read_user_locale(USER_MD)
     locale_name, locale_block = resolve_locale(locale_label, mapping)
-    _warn_caller_locale_mismatch(args, locale_name)
     if locale_name == "unknown" and not args.allow_unknown_locale:
         payload = {
             "schema": f"{args.caller_skill}/discover-v1",

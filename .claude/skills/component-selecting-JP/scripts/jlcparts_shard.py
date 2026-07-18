@@ -33,6 +33,8 @@ from pathlib import Path
 from typing import Any
 
 DATA_BASE = "https://yaqwsx.github.io/jlcparts/data"
+# Keep in lockstep with component_select.py WORKSPACE_ROOT (same parents[4]
+# depth; not imported to keep this CLI free of the 4k-line engine).
 WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
 CACHE_DIR = WORKSPACE_ROOT / "lib_cache" / "sources" / "jlcparts"
 SHARD_DIR = CACHE_DIR / "shards"
@@ -65,14 +67,16 @@ _META_ATTRS = {
 # cache plumbing
 
 
-def _load_state() -> dict[str, Any]:
+# Named distinctly from _dk_throttle._load_state/_save_state (throttle state)
+# — this one tracks download freshness only. Shape: {file_name: fetched_at_ts}.
+def _read_fetch_state() -> dict[str, Any]:
     try:
         return json.loads(STATE_FILE.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
 
-def _save_state(state: dict[str, Any]) -> None:
+def _write_fetch_state(state: dict[str, Any]) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     STATE_FILE.write_text(json.dumps(state, indent=1), encoding="utf-8")
 
@@ -94,15 +98,21 @@ def _ensure_file(
 ) -> Path | None:
     """Fetch `name` from the snapshot into `dest` unless a fresh copy exists.
     Refresh failure degrades to the stale copy (offline-graceful)."""
-    state = _load_state()
-    fetched_at = float(state.get(name, {}).get("fetched_at") or 0)
+    state = _read_fetch_state()
+    entry = state.get(name)
+    if isinstance(entry, dict):
+        entry = entry.get("fetched_at")
+    try:
+        fetched_at = float(entry or 0)
+    except (TypeError, ValueError):
+        fetched_at = 0.0
     age_days = (time.time() - fetched_at) / 86400 if fetched_at else float("inf")
     if dest.exists() and not refresh and age_days <= max_age_days:
         return dest
     try:
         _fetch(f"{DATA_BASE}/{name}", dest)
-        state.setdefault(name, {})["fetched_at"] = time.time()
-        _save_state(state)
+        state[name] = time.time()
+        _write_fetch_state(state)
         return dest
     except Exception as exc:
         if dest.exists():
@@ -202,6 +212,10 @@ def _match_categories(manifest: dict[str, Any], needle: str) -> list[dict[str, A
     return out
 
 
+def _cell(arr: list[Any], i: Any) -> Any:
+    return arr[i] if isinstance(i, int) and i < len(arr) else None
+
+
 def _iter_shard_rows(path: Path):
     """Yield (header_map, row_list) pairs from one columnar browse shard."""
     with gzip.open(path, "rt", encoding="utf-8") as fh:
@@ -264,30 +278,39 @@ def discover_rows(
             if shard_path is None:
                 continue
             try:
+                # Column indices resolved once per shard (header repeats per
+                # row from the iterator; shards run 100k+ rows).
+                i_lcsc = i_mfr = i_stock = i_attrs = i_desc = i_price = i_ds = None
                 for header, arr in _iter_shard_rows(shard_path):
-                    idx = {k: header[k] for k in header}
-
-                    def col(name: str) -> Any:
-                        i = idx.get(name)
-                        return arr[i] if isinstance(i, int) and i < len(arr) else None
-
-                    lcsc_id = str(col("lcsc") or "")
-                    mpn = str(col("mfr") or "")
+                    if i_mfr is None:
+                        i_lcsc = header.get("lcsc")
+                        i_mfr = header.get("mfr")
+                        i_stock = header.get("stock")
+                        i_attrs = header.get("attributes")
+                        i_desc = header.get("description")
+                        i_price = header.get("price")
+                        i_ds = header.get("datasheet")
+                    lcsc_id = str(_cell(arr, i_lcsc) or "")
+                    mpn = str(_cell(arr, i_mfr) or "")
                     if not mpn or lcsc_id in seen:
                         continue
-                    stock = col("stock")
+                    stock = _cell(arr, i_stock)
                     if isinstance(stock, (int, float)) and stock < min_stock:
                         continue
-                    attrs = _decode_attributes(col("attributes"), lut)
+                    attrs = _decode_attributes(_cell(arr, i_attrs), lut)
                     if str(attrs.get("Status", "Active")).lower() != "active":
                         continue
                     if basic_only and "basic" not in str(attrs.get("Basic/Extended", "")).lower():
                         continue
-                    description = str(col("description") or "")
+                    description = str(_cell(arr, i_desc) or "")
                     pkg = attrs.get("Package") or ""
                     if package_l and package_l not in (pkg + " " + description).lower():
                         continue
-                    if query_l and query_l not in (mpn + " " + description + " " + json.dumps(list(attrs.values()), ensure_ascii=False)).lower():
+                    if query_l and not (
+                        query_l in mpn.lower()
+                        or query_l in description.lower()
+                        or any(query_l in str(v).lower() for v in attrs.values())
+                    ):
                         continue
                     key_params = {k: v for k, v in attrs.items() if k not in _META_ATTRS}
                     seen.add(lcsc_id)
@@ -299,14 +322,14 @@ def discover_rows(
                             "source_keyword": str(cat.get("subcategory") or needle),
                             "manufacturer": attrs.get("Manufacturer", ""),
                             "stock": stock,
-                            "price": _first_tier_price(col("price")),
+                            "price": _first_tier_price(_cell(arr, i_price)),
                             "currency": "CNY",
                             "lcsc_id": lcsc_id,
                             "package": pkg,
                             "package_hint": pkg,
                             "distributor_package": pkg,
                             "description": description,
-                            "datasheet_url": col("datasheet"),
+                            "datasheet_url": _cell(arr, i_ds),
                             "key_parameters": key_params,
                             "is_basic": "basic" in str(attrs.get("Basic/Extended", "")).lower(),
                         }

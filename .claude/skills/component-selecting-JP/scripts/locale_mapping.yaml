@@ -37,6 +37,7 @@
 #   fx_display                      - cny_jpy（LCSC 报价换算 JPY）| none（原币显示，不打汇率 API）
 #   discover_sources                - --discover 默认源顺序（local / digikey / lcsc / lcsc_parametric / jlcparts）
 #   lcsc_attributes_as_parameters   - "on"|"off"：jlcsearch attributes 是否归一化进 raw_parameters
+#   param_keywords_extra            - key_parameters generic 抽取的补充关键词（如被动件 resistance/esr）
 #   display                         - stdout 摘要渲染（lane_order / lane_labels / emit_lane_flags: jp|none /
 #                                     lcsc_only_note / footer_note / lifecycle_note）
 #   ⚠ 新键约束（load_yaml_simple 兼容）：禁行内注释、禁 boolean（用字符串）、禁 list-of-dicts
@@ -252,6 +253,7 @@ locales:
     fx_display: none
     discover_sources: [local, lcsc_parametric, lcsc, jlcparts]
     lcsc_attributes_as_parameters: "on"
+    param_keywords_extra: [resistance, capacitance, inductance, impedance, tolerance, esr]
     display:
       lane_order: [lcsc]
       lane_labels:
