@@ -233,6 +233,7 @@ This workspace stands on excellent open-source work. Sincere thanks to these pro
 
 - **[KiCad](https://www.kicad.org/)** — the EDA foundation of the entire pipeline. Every schematic, board, ERC/DRC check, render, and Gerber goes through `kicad-cli` and the `pcbnew` Python API, on top of the official KiCad symbol / footprint / 3D libraries.
 - **[ngspice](https://ngspice.sourceforge.io/)** — powers every SPICE check: subcircuit simulation in `check-schematic` and parasitic re-simulation in `check-pcb`.
+- **[kicad-happy](https://github.com/aklofas/kicad-happy)** by aklofas — AI-agent skills for KiCad; the `check-pcb` analysis suite (EMC / thermal / lifecycle audit / project config / issue export) builds on it.
 - **[circuit-synth](https://github.com/circuit-synth/circuit-synth)** — Python-source-driven `.kicad_sch` generation, the engine of `draw-schematic`.
 - **[kicad-sch-api](https://github.com/circuit-synth/kicad-sch-api)** — programmatic schematic editing (MPN property injection, post-processing).
 - **[easyeda2kicad](https://github.com/uPesy/easyeda2kicad.py)** — converts LCSC / EasyEDA parts into KiCad symbols / footprints / 3D models for `component-preparing`.
