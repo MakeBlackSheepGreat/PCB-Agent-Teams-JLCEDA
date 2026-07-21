@@ -1,0 +1,116 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: "Segoe UI", "Microsoft Sans Serif", Tahoma, sans-serif;
+  font-size: 12px; color: #000; background: #f0f0f0;
+}
+.dialog { display: flex; flex-direction: column; height: 100vh; }
+
+/* ─── Body Split: Left / Right ─── */
+.body-split {
+  display: flex; flex-direction: row;
+  flex: 1; overflow: hidden;
+  padding: 8px; gap: 0;
+}
+
+/* ─── Left Panel ─── */
+.left-panel {
+  width: 300px; min-width: 220px;
+  display: flex; flex-direction: column;
+  padding-right: 10px;
+  border-right: 1px solid #a0a0a0;
+  overflow-y: auto;
+}
+
+/* ─── Right Panel ─── */
+.right-panel {
+  flex: 1;
+  padding-left: 10px;
+  overflow-y: auto;
+}
+
+/* ─── Section Titles ─── */
+.section-title { font-weight: 700; font-size: 12px; margin-bottom: 4px; margin-top: 8px; }
+.left-panel .section-title:first-child,
+.right-panel .section-title:first-child { margin-top: 0; }
+.section-desc { font-size: 11px; color: #444; margin-bottom: 6px; }
+
+/* ─── Checkbox Groups ─── */
+.checkbox-group { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+.checkbox-group.horizontal { flex-direction: row; flex-wrap: wrap; gap: 4px 16px; }
+.checkbox-group label {
+  font-size: 12px; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+}
+.checkbox-group input[type="checkbox"] { margin: 0; width: 13px; height: 13px; }
+
+/* ─── Form Rows ─── */
+.form-row { display: flex; align-items: center; margin-bottom: 4px; }
+.form-label { font-size: 12px; min-width: 85px; white-space: nowrap; }
+.form-row select, .form-row input[type="text"] {
+  flex: 1; padding: 2px 4px;
+  border: 1px solid #7a7a7a; background: #fff;
+  font-size: 12px; font-family: inherit;
+}
+
+/* ─── Net List ─── */
+.net-list {
+  flex: 1; border: 1px solid #7a7a7a; background: #fff;
+  overflow-y: auto; min-height: 180px; margin-top: 4px;
+}
+.net-item {
+  padding: 1px 4px; display: flex; align-items: center; gap: 4px;
+  font-size: 12px; cursor: default; user-select: none; line-height: 18px;
+}
+.net-item:hover { background: #e5f3ff; }
+.net-item.selected { background: #0078d7; color: #fff; }
+.net-item .net-check {
+  width: 14px; font-size: 12px; text-align: center;
+  color: #0078d7; flex-shrink: 0;
+}
+.net-item.selected .net-check { color: #fff; }
+.net-item .net-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.net-item.connected { color: #888; }
+.net-item.connected.selected { color: #fff; }
+
+/* ─── Param Grid ─── */
+.param-grid {
+  display: grid; grid-template-columns: auto 1fr;
+  gap: 4px 8px; align-items: center; margin-bottom: 6px;
+}
+.param-grid .form-label { font-size: 12px; white-space: nowrap; text-align: left; }
+.param-grid input[type="number"], .param-grid input[type="text"] {
+  padding: 2px 4px; border: 1px solid #7a7a7a; background: #fff;
+  font-size: 12px; font-family: inherit; width: 100%;
+}
+.param-grid input:focus { outline: none; border-color: #0078d7; }
+.param-grid.compact { margin-top: 4px; }
+
+/* ─── Progress ─── */
+.progress-bar {
+  height: 18px; background: #e0e0e0; border: 1px solid #7a7a7a;
+  overflow: hidden; margin-bottom: 3px;
+}
+.progress-fill { height: 100%; background: #06b025; transition: width 0.3s; width: 0%; }
+.progress-text { font-size: 11px; color: #333; }
+
+/* ─── Bottom Button Bar ─── */
+.button-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 8px; border-top: 1px solid #a0a0a0; background: #f0f0f0;
+  flex-shrink: 0;
+}
+.button-bar-left, .button-bar-right { display: flex; gap: 6px; }
+.button-bar button {
+  padding: 4px 20px; border: 1px solid #7a7a7a;
+  background: #e1e1e1; font-size: 12px; font-family: inherit;
+  cursor: pointer; min-width: 75px;
+}
+.button-bar button:hover { background: #d0d0d0; border-color: #555; }
+.button-bar button:active { background: #c0c0c0; }
+.button-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ─── Status Bar ─── */
+.status-bar {
+  padding: 3px 8px; background: #e8e8e8; border-top: 1px solid #c0c0c0;
+  font-size: 11px; color: #333; flex-shrink: 0;
+}

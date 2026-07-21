@@ -1,0 +1,53 @@
+{
+	"name": "jlc-eda-design-companion",
+	"uuid": "f7a6e2e44d4a4a2a9e3d65d84a1d5c71",
+	"displayName": "JLCEDA Design Companion",
+	"description": "嘉立创 EDA Pro 的本地设计协同工具，提供 KiCadRouting 自动布线、布线前检查和板卡数据审查",
+	"version": "0.1.0",
+	"publisher": "MakeBlackSheepGreat",
+	"engines": {
+		"eda": "^3.2.0"
+	},
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "extension-store",
+		"url": "https://github.com/MakeBlackSheepGreat/PCB-Agent-Teams-JLCEDA/tree/main/extensions/jlc-eda-pro-companion"
+	},
+	"categories": "PCB",
+	"keywords": ["Autoroute", "PCB", "Routing", "布线", "自动布线"],
+	"images": {
+		"logo": "./images/logo.png"
+	},
+	"homepage": "https://github.com/MakeBlackSheepGreat/PCB-Agent-Teams-JLCEDA",
+	"bugs": "https://github.com/MakeBlackSheepGreat/PCB-Agent-Teams-JLCEDA/issues",
+	"activationEvents": {
+		"onEditorPcb": true
+	},
+	"entry": "./dist/index",
+	"dependentExtensions": {},
+	"headerMenus": {
+		"pcb": [
+			{
+				"id": "JlcEdaDesignCompanion",
+				"title": "JLCEDA Design Companion",
+				"menuItems": [
+					{
+						"id": "OpenRoutingWorkspace",
+						"title": "打开布线工具...",
+						"registerFn": "autoRouteAll"
+					},
+					{
+						"id": "RunBoardPreflight",
+						"title": "运行布线前检查...",
+						"registerFn": "runBoardPreflight"
+					},
+					{
+						"id": "About",
+						"title": "关于...",
+						"registerFn": "about"
+					}
+				]
+			}
+		]
+	}
+}

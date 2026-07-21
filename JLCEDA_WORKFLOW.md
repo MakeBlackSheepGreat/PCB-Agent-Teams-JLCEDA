@@ -14,6 +14,7 @@
 | 原理图与 PCB 编辑 | GUI 流程 | 在嘉立创 EDA 内执行并保留工程快照 |
 | ERC 与 DRC | GUI 流程 | 在嘉立创 EDA 内执行，结果保存到 `review/` |
 | BOM/CPL/Gerber 一致性检查 | 可用 | `validate_export.py` |
+| 可选自动布线与布线前检查 | 可用 | `extensions/jlc-eda-pro-companion/` |
 | 嘉立创打样和贴片下单 | 人工复核 | 由制造预览和下单页面完成最终确认 |
 
 ## 与上游 KiCad 流程的对应关系
@@ -44,6 +45,12 @@ py .claude/skills/jlc-eda-workflow/scripts/init_project.py led_driver_12v --goal
 6. 导出 BOM、CPL 和 Gerber ZIP 到 `easyeda/exports/`。
 7. 运行校验器，修复 `fail` 条目，逐项确认 `warning` 条目。
 8. 把最终下单文件复制到 `release/`，更新 `STATUS.md`。
+
+## 可选自动布线
+
+`extensions/jlc-eda-pro-companion/` 是本 fork 自制的 EasyEDA Pro 扩展。它继承 KiRouting Integration 的本地桥接结构，通过 KiCadRoutingTools 对选定网络自动布线，并增加布线前检查和默认保留已有铜箔的保护策略。
+
+在图纸摆件、板框、层叠和规则已经确认后，启动 `extensions/jlc-eda-pro-companion/bridge_server/start_server.bat`，在 EasyEDA Pro 中开启“外部交互”，安装构建得到的 `.eext`。自动布线结束后必须回到 EasyEDA Pro 进行走线审查和 DRC。
 
 ## 导出校验
 

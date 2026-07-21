@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Board Preflight</title>
+  <style>
+    :root { color: #17212b; background: #f5f7f8; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+    body { margin: 0; min-width: 580px; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #ffffff; border-bottom: 1px solid #ccd5da; }
+    h1 { margin: 0; font-size: 16px; font-weight: 600; }
+    button { border: 1px solid #186bb0; background: #1e78c4; color: #fff; padding: 6px 12px; font: inherit; cursor: pointer; }
+    button:hover { background: #135f9f; }
+    main { padding: 14px 16px; }
+    .verdict { display: inline-block; min-width: 68px; padding: 4px 8px; color: #fff; font-size: 12px; font-weight: 600; text-align: center; text-transform: uppercase; }
+    .pass { background: #18794e; }
+    .warning { background: #af6a00; }
+    .fail { background: #b42318; }
+    .summary { display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); border: 1px solid #ccd5da; margin: 12px 0; background: #fff; }
+    .metric { padding: 10px; border-right: 1px solid #e4e9ec; }
+    .metric:last-child { border-right: 0; }
+    .metric span { display: block; color: #65727c; font-size: 11px; }
+    .metric strong { display: block; margin-top: 3px; font-size: 19px; font-weight: 600; }
+    h2 { margin: 16px 0 7px; font-size: 13px; font-weight: 600; }
+    #findings { margin: 0; padding: 0; list-style: none; border-top: 1px solid #ccd5da; }
+    #findings li { padding: 9px 10px; border: 1px solid #ccd5da; border-top: 0; background: #fff; font-size: 12px; line-height: 1.45; }
+    .severity { display: inline-block; min-width: 57px; margin-right: 7px; font-weight: 600; }
+    .severity.error { color: #b42318; }
+    .severity.warning { color: #9a5b00; }
+    .empty { padding: 12px; color: #52606b; border: 1px solid #ccd5da; background: #fff; }
+    .detail { color: #52606b; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>PCB 布线前检查</h1><div class="detail" id="detail">正在读取当前 PCB</div></div>
+    <button type="button" id="refresh">刷新</button>
+  </header>
+  <main>
+    <span class="verdict warning" id="verdict">PENDING</span>
+    <div class="summary" id="summary"></div>
+    <h2>发现项</h2>
+    <ul id="findings"><li class="empty">等待检查结果</li></ul>
+    <h2>识别到的关键网络</h2>
+    <div class="detail" id="net-detail">-</div>
+  </main>
+  <script>
+    (function () {
+      'use strict';
+      var prefix = 'jlc-eda-design-companion.';
+      var edaObj = typeof eda !== 'undefined' ? eda : (window.parent && window.parent.eda);
+
+      function publish(topic, payload) {
+        if (!edaObj || !edaObj.sys_MessageBus) return;
+        var message = JSON.stringify(payload || {});
+        if (typeof edaObj.sys_MessageBus.publish === 'function') edaObj.sys_MessageBus.publish(prefix + topic, message);
+        else if (typeof edaObj.sys_MessageBus.push === 'function') edaObj.sys_MessageBus.push(prefix + topic, message);
+      }
+
+      function subscribe(topic, handler) {
+        if (!edaObj || !edaObj.sys_MessageBus || typeof edaObj.sys_MessageBus.subscribe !== 'function') return;
+        edaObj.sys_MessageBus.subscribe(prefix + topic, function (message) {
+          try { handler(typeof message === 'string' ? JSON.parse(message) : message); }
+          catch (_) { document.getElementById('detail').textContent = '检查结果格式无效'; }
+        });
+      }
+
+      function text(value) { return String(value == null ? '' : value); }
+      function esc(value) { return text(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+      function render(data) {
+        var verdict = text(data.verdict || 'warning').toLowerCase();
+        if (verdict !== 'pass' && verdict !== 'warning' && verdict !== 'fail') verdict = 'warning';
+        var badge = document.getElementById('verdict');
+        badge.className = 'verdict ' + verdict;
+        badge.textContent = verdict + '  ' + text(data.readiness_score == null ? '-' : data.readiness_score);
+
+        var summary = data.summary || {};
+        var metrics = [
+          ['元件', summary.components], ['焊盘', summary.pads], ['网络', summary.nets], ['走线', summary.tracks],
+          ['过孔', summary.vias], ['铜层', summary.copper_layers], ['板框图元', summary.outline_primitives], ['差分对', (summary.differential_pair_bases || []).length]
+        ];
+        document.getElementById('summary').innerHTML = metrics.map(function (metric) {
+          return '<div class="metric"><span>' + esc(metric[0]) + '</span><strong>' + esc(metric[1] == null ? 0 : metric[1]) + '</strong></div>';
+        }).join('');
+
+        var findings = Array.isArray(data.findings) ? data.findings : [];
+        document.getElementById('findings').innerHTML = findings.length ? findings.map(function (finding) {
+          var severity = text(finding.severity || 'warning').toLowerCase();
+          return '<li><span class="severity ' + esc(severity) + '">' + esc(severity.toUpperCase()) + '</span>' + esc(finding.message) + '</li>';
+        }).join('') : '<li class="empty">未发现阻断项</li>';
+
+        var power = (summary.power_nets || []).join(', ') || '未识别';
+        var pairs = (summary.differential_pair_bases || []).join(', ') || '未识别';
+        document.getElementById('net-detail').textContent = '电源网络：' + power + '；差分对：' + pairs;
+        document.getElementById('detail').textContent = '当前 PCB 数据已检查';
+      }
+
+      subscribe('dashboard-data', render);
+      subscribe('dashboard-error', function (data) {
+        document.getElementById('detail').textContent = text(data.error || '检查失败');
+      });
+      document.getElementById('refresh').addEventListener('click', function () {
+        document.getElementById('detail').textContent = '正在刷新检查结果';
+        publish('dashboard-refresh', {});
+      });
+      publish('dashboard-ready', {});
+    }());
+  </script>
+</body>
+</html>

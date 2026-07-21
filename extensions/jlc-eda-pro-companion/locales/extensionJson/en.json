@@ -1,0 +1,11 @@
+{
+	"Autoroute": "Autoroute",
+	"KiRouting": "KiCad Auto-Routing Bridge",
+	"PCB": "PCB",
+	"Routing": "Routing",
+	"关于...": "About...",
+	"布线": "Routing",
+	"打开布线工具...": "Open Routing Tool...",
+	"自动布线": "Auto-Routing",
+	"通过本地桥接服务器调用 KiCadRoutingTools 实现 PCB 自动布线，支持单端布线、差分对、BGA扇出等高级功能": "Bridge extension to use KiCadRouting Tools for PCB auto-routing in EasyEDA Pro, supports single-ended routing, differential pairs, BGA fanout and other advanced features"
+}

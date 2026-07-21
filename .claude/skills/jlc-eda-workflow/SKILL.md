@@ -13,6 +13,7 @@ description: 嘉立创 EDA PCB 工作流协调技能。用于新建嘉立创 EDA
 - 原仓库的 `draw-schematic`、`draw-pcb`、`check-schematic`、`check-pcb` 依赖 KiCad 文件格式，嘉立创 EDA 项目不调用这些 KiCad 生成和分析脚本。
 - `component-selecting-CN` 可继续用于中国大陆选型；候选料号、LCSC 编号、数据手册链接需落到项目文档后再放入嘉立创 EDA。
 - 嘉立创 EDA 的 ERC/DRC、封装预览、3D 检查和制造预览由操作者在 GUI 中完成；检查结论记录到 `review/` 和 `STATUS.md`。
+- `extensions/jlc-eda-pro-companion/` 提供可选的 KiCadRouting 自动布线与布线前检查。它只处理明确选择的网络，完成后仍需在 GUI 中审查和执行 DRC。
 
 ## 项目骨架
 
@@ -45,7 +46,7 @@ Projects/<name>/
 | 2.5 | 用数据手册核对封装、引脚与额定值 | 数据手册证据、确认后的采购 BOM |
 | 3 | 在嘉立创 EDA 绘制原理图并执行 ERC | 原理图截图、ERC 记录 |
 | 3.5 | 审核网络、去耦、极性、接口和关键参数 | `review/schematic_review.md` |
-| 4 | 在嘉立创 EDA 布局布线并执行 DRC | PCB 工程、3D/DRC 截图 |
+| 4 | 在嘉立创 EDA 布局布线并执行 DRC；可选使用 Design Companion | PCB 工程、预检查结果、3D/DRC 截图 |
 | 4.5 | 导出并核对 BOM、CPL、Gerber | `review/export_validation.json` |
 | 5 | 在嘉立创下单页面复核工艺、拼板和贴片选项 | `release/` 下单记录 |
 
@@ -92,8 +93,9 @@ py .claude/skills/jlc-eda-workflow/scripts/validate_export.py `
 
 1. 先放连接器、功率器件、隔离边界和关键 IC，再放去耦与反馈网络。
 2. 高电流回路、开关节点、模拟敏感区、差分线和天线区必须写入 `PROJECT.md` 的布局约束。
-3. 铺铜后重新运行 DRC；检查丝印压焊盘、极性、安装孔、板框和禁布区。
-4. 在嘉立创制造预览中确认层数、板厚、铜厚、阻焊颜色、工艺边和贴片选项。
+3. 使用自动布线前先运行 Design Companion 的“布线前检查”；覆盖已有走线必须在界面中显式勾选。
+4. 铺铜后重新运行 DRC；检查丝印压焊盘、极性、安装孔、板框和禁布区。
+5. 在嘉立创制造预览中确认层数、板厚、铜厚、阻焊颜色、工艺边和贴片选项。
 
 ## 常用请求
 

@@ -102,6 +102,8 @@ Each skill is a standalone toolbox, **not a mandatory pipeline**. At any stage y
 4. 运行 `jlc-eda-workflow/scripts/validate_export.py`，核对位号、坐标、层、旋转和 Gerber 文件结构。
 5. 通过导出检查后再进入嘉立创打样或 SMT 下单页面。
 
+可选的 `extensions/jlc-eda-pro-companion/` 提供 EasyEDA Pro 自动布线和布线前检查，复用 KiCadRoutingTools 的 A* 引擎。它默认保留已有铜箔，完成后仍需在 EasyEDA Pro 中执行 DRC。
+
 新建项目：
 
 ```powershell

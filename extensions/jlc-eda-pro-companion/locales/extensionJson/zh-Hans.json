@@ -1,0 +1,11 @@
+{
+	"Autoroute": "自动布线",
+	"KiRouting": "KiRouting",
+	"PCB": "PCB",
+	"Routing": "布线",
+	"关于...": "关于...",
+	"布线": "布线",
+	"打开布线工具...": "打开布线工具...",
+	"自动布线": "自动布线",
+	"通过本地桥接服务器调用 KiCadRoutingTools 实现 PCB 自动布线，支持单端布线、差分对、BGA扇出等高级功能": "通过本地桥接服务器调用 KiCadRoutingTools 实现 PCB 自动布线，支持单端布线、差分对、BGA扇出等高级功能"
+}
