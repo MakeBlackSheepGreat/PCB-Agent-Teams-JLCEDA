@@ -1,0 +1,66 @@
+# 嘉立创 EDA 工作流
+
+## 定制目标
+
+本 fork 保留上游 KiCad 版本的阶段化思路：先固定需求和拓扑，再做可采购选型与数据手册核对，随后绘图、检查、导出和下单。嘉立创 EDA GUI 承担原理图和 PCB 的实际编辑工作。
+
+## 当前能力
+
+| 能力 | 状态 | 说明 |
+| --- | --- | --- |
+| 项目骨架 | 可用 | `jlc-eda-workflow/scripts/init_project.py` |
+| 中国大陆选型 | 可用 | 复用 `component-selecting-CN` 的 LCSC 选型思路 |
+| 数据手册与封装核对 | 可用 | 以项目 BOM、数据手册和嘉立创 EDA 元件属性为依据 |
+| 原理图与 PCB 编辑 | GUI 流程 | 在嘉立创 EDA 内执行并保留工程快照 |
+| ERC 与 DRC | GUI 流程 | 在嘉立创 EDA 内执行，结果保存到 `review/` |
+| BOM/CPL/Gerber 一致性检查 | 可用 | `validate_export.py` |
+| 嘉立创打样和贴片下单 | 人工复核 | 由制造预览和下单页面完成最终确认 |
+
+## 与上游 KiCad 流程的对应关系
+
+| 上游概念 | 嘉立创 EDA 定制实现 |
+| --- | --- |
+| `.kicad_sch` 生成 | 嘉立创 EDA 原理图工程与导出 PDF |
+| KiCad ERC | 嘉立创 EDA ERC 报告与截图 |
+| `.kicad_pcb` 自动布局 | 嘉立创 EDA PCB 工程与人工布局记录 |
+| KiCad DRC | 嘉立创 EDA DRC 报告与 3D/制造预览 |
+| KiCad 生产 BOM/CPL | 嘉立创 EDA 导出的 BOM 与 CPL |
+| Gerber 导出和 release | 嘉立创 EDA Gerber ZIP 加导出包校验与下单记录 |
+
+## 第一次项目的最小路径
+
+```powershell
+cd C:\Users\876762330\Desktop\projects\PCB-Agent-Teams-JLCEDA
+py .claude/skills/jlc-eda-workflow/scripts/init_project.py led_driver_12v --goal "12V 输入 LED 恒流驱动板"
+```
+
+随后按以下节奏工作：
+
+1. 在 `Projects/led_driver_12v/PROJECT.md` 填写电压、电流、接口、尺寸、成本、封装能力和环境约束。
+2. 完成拓扑与元件选型，记录 LCSC 编号、数据手册、封装和替代料。
+3. 在嘉立创 EDA 创建工程，原工程快照放入 `easyeda/source/`。
+4. 绘制原理图并执行 ERC；将截图和问题处理记录放入 `review/`。
+5. 完成 PCB 布局布线和 DRC；确认丝印、板框、安装孔和制造预览。
+6. 导出 BOM、CPL 和 Gerber ZIP 到 `easyeda/exports/`。
+7. 运行校验器，修复 `fail` 条目，逐项确认 `warning` 条目。
+8. 把最终下单文件复制到 `release/`，更新 `STATUS.md`。
+
+## 导出校验
+
+```powershell
+py .claude/skills/jlc-eda-workflow/scripts/validate_export.py `
+  --bom Projects/led_driver_12v/easyeda/exports/bom.csv `
+  --cpl Projects/led_driver_12v/easyeda/exports/cpl.csv `
+  --gerber Projects/led_driver_12v/easyeda/exports/gerbers.zip `
+  --require-all-cpl `
+  --output Projects/led_driver_12v/review/export_validation.json
+```
+
+当只需要 SMT 贴片坐标时，去掉 `--require-all-cpl`。连接器、安装孔和手焊 THT 元件没有 CPL 坐标时会报告为 `warning`，需要结合下单方式确认。
+
+## 后续定制方向
+
+- 解析嘉立创 EDA 的 BOM/CPL 实际导出样本，扩展 CSV 别名和字段规则。
+- 为常见板型建立布局审查模板，例如 Buck、USB-C、STM32 最小系统、继电器隔离板。
+- 接入嘉立创 EDA 的稳定开放接口后，再实现工程元件属性和设计规则的自动读取。
+- 针对真实下单失败案例补充可复用规则和测试样本。

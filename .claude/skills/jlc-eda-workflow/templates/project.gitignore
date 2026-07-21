@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+easyeda/exports/*.zip
+easyeda/exports/*.pdf
+release/
+_artifacts/

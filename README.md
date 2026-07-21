@@ -1,4 +1,8 @@
-# PCB-Agent-Teams — KiCad PCB Workflow
+# PCB-Agent-Teams-JLCEDA — 嘉立创 EDA 与 KiCad PCB 工作流
+
+> 此 fork 新增 `jlc-eda-workflow`：保留上游 Phase 0-5、选型 gate、审查和制造交付思路，使用嘉立创 EDA GUI 绘制图纸并校验其导出的 BOM、CPL、Gerber。详见 [嘉立创 EDA 工作流](JLCEDA_WORKFLOW.md)。
+
+> 上游 KiCad 工作流及其 10 个原始 skills 仍完整保留，方便对照流程与后续自动化研究。
 
 > A multi-project PCB design workspace orchestrated around KiCad 10. Ten skills drive a Phase 0–5 pipeline that covers the full chain, from topology discussion to Gerber shipout.
 
@@ -18,7 +22,7 @@ PCB-Agent-Teams/
 ├── USER.md               ← your profile: hardware on hand / locale / skills / preferences (gitignored)
 ├── requirements.txt      ← Python dependencies
 ├── .claude/
-│   ├── skills/           ← 10 skills
+│   ├── skills/           ← 10 个 KiCad skills + 1 个嘉立创 EDA 工作流 skill
 │   └── references/       ← workspace meta-protocols (protocols.md)
 ├── lib_external/         ← shared component library (starts empty; component-preparing vendors symbols/footprints/3D here)
 ├── lib_cache/sources/    ← read-only cache of external libs (pre-filter pool)
@@ -87,6 +91,34 @@ Worried the AI passes on the surface but hides problems? Every key quantity is c
 ## Skill pipeline
 
 Each skill is a standalone toolbox, **not a mandatory pipeline**. At any stage you can: use a skill / do it by hand / skip it. Multi-step skills also support mid-run human review (render / DRC / simulation); roll back if unsatisfied.
+
+## 嘉立创 EDA 工作流
+
+`jlc-eda-workflow` 是此 fork 的新增入口，适合以嘉立创 EDA 为主的设计者：
+
+1. 用 `jlc-eda-workflow` 的项目初始化脚本创建骨架，保存参数、选型证据和状态记录。
+2. 在嘉立创 EDA GUI 内完成原理图、PCB、ERC、DRC、3D 预览和制造预览。
+3. 将 BOM、CPL、Gerber ZIP 放入项目的 `easyeda/exports/`。
+4. 运行 `jlc-eda-workflow/scripts/validate_export.py`，核对位号、坐标、层、旋转和 Gerber 文件结构。
+5. 通过导出检查后再进入嘉立创打样或 SMT 下单页面。
+
+新建项目：
+
+```powershell
+py .claude/skills/jlc-eda-workflow/scripts/init_project.py buck_5v_3a --goal "12V 输入，5V 3A 输出的降压电源板"
+```
+
+导出包校验：
+
+```powershell
+py .claude/skills/jlc-eda-workflow/scripts/validate_export.py `
+  --bom Projects/<name>/easyeda/exports/bom.csv `
+  --cpl Projects/<name>/easyeda/exports/cpl.csv `
+  --gerber Projects/<name>/easyeda/exports/gerbers.zip `
+  --output Projects/<name>/review/export_validation.json
+```
+
+完整步骤与当前边界见 [JLCEDA_WORKFLOW.md](JLCEDA_WORKFLOW.md)。
 
 | Phase | Skill | Responsibility |
 | --- | --- | --- |
@@ -223,6 +255,7 @@ All keys go in `.env` (copied from `.env.example`). For the JP locale, DigiKey i
 
 | I want to… | Go to |
 | --- | --- |
+| Use JLCEDA / EasyEDA | [JLCEDA_WORKFLOW.md](JLCEDA_WORKFLOW.md) |
 | Understand the overall routing | [CLAUDE.md](CLAUDE.md) |
 | Learn a specific skill | `.claude/skills/<skill>/SKILL.md` |
 | See cross-project electrical invariants | `.claude/skills/circuit-design/references/electrical_invariants.md` |

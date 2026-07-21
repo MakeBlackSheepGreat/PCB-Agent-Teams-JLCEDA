@@ -15,7 +15,7 @@ PCB-Agent-Teams/
 ├── .claude/
 │   ├── references/       ← 工作区级元协议（按需读）
 │   │   └── protocols.md  ← USER 维护 / 计划先行 / sub-agent 分工 / 监控 / Phase 编号
-│   └── skills/           ← 10 个正式 skill
+│   └── skills/           ← 10 个 KiCad skill + 1 个嘉立创 EDA 工作流 skill
 └── Projects/<name>/      ← 项目骨架（用 project-init 生成）
 ```
 
@@ -34,6 +34,7 @@ PCB-Agent-Teams/
 | 项目 **live 进度** / artifact 索引 / change log / 回退记录 | `Projects/<name>/STATUS.md` |
 | 项目骨架模板（CLAUDE.md 9 章节 + STATUS.md dashboard） | `.claude/skills/project-init/templates/` |
 | 共享库写入规则 | `lib_external/CONVENTIONS.md` |
+| 嘉立创 EDA 工作流、导出校验与限制 | `JLCEDA_WORKFLOW.md` |
 
 ## 阶段 × skill 一表（核心路由）
 
@@ -56,6 +57,18 @@ PCB-Agent-Teams/
 - **采购 BOM**（component-preparing 写）→ distributor 下单买料
 - **生产 BOM / CPL**（release/scripts/export_gerbers.py 写）→ fab 厂贴片装配
 - 详见 `.claude/skills/component-preparing/references/bom_lifecycle.md`
+
+## 嘉立创 EDA 路由
+
+| 场景 | 入口 | 产物 |
+| --- | --- | --- |
+| 新建嘉立创 EDA 项目 | `jlc-eda-workflow/scripts/init_project.py` | `Projects/<name>/PROJECT.md`、`STATUS.md`、`easyeda/` 目录 |
+| 电路方案与选型 | `circuit-design` + `component-selecting-CN` | 拓扑、LCSC 料号、数据手册核对表 |
+| 嘉立创 EDA 绘图 | 嘉立创 EDA GUI | 原理图、PCB、ERC/DRC、3D 与制造预览 |
+| 导出文件审查 | `jlc-eda-workflow/scripts/validate_export.py` | BOM/CPL/Gerber 校验 JSON |
+| 嘉立创下单 | GUI 制造预览 + `STATUS.md` 记录 | `release/` 内的确认文件与下单记录 |
+
+嘉立创 EDA 工程文件保存于 `Projects/<name>/easyeda/source/`，脚本只检查导出的 BOM、CPL 和 Gerber，不直接改写图纸工程。KiCad 专属的 `draw-schematic`、`draw-pcb`、`check-schematic`、`check-pcb` 仍保留给 KiCad 项目使用。
 
 ## Locale 路由（按 USER.md §0 所属地）
 
