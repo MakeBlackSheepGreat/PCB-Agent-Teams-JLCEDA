@@ -23,15 +23,15 @@
 
 ## 嘉立创 EDA 工程记录
 
-- 原工程文件保存到 `easyeda/source/`。
+- 原工程文件保存到 `easyeda/source/`，它是唯一设计来源。
 - 导出的 BOM、CPL、Gerber ZIP 保存到 `easyeda/exports/`。
 - 每次导出前记录 EDA 版本和工程版本号。
 
-## KiCad 协同记录
+## 可选 KiCad 验证
 
-- Agent 生成的 KiCad 原理图与 PCB 保存到 `kicad/`，作为自主设计的工程源。
-- 运行 `prepare_kicad_handoff.py` 后，将 `handoff/kicad_to_easyeda.json` 与对应 KiCad 文件一起导入 EasyEDA Pro。
-- EasyEDA Pro 内的人工调整必须记录为 ECO，并在下一次交接前同步回 KiCad。
+- `kicad/` 用于可选的仿真、EMC、热、寄生参数分析或离线审查。
+- KiCad 结果保存到 `handoff/`，用于补充审查证据。
+- 嘉立创 EDA Pro 内的设计变更直接保存到 `easyeda/source/`。
 
 ## PCB 布局约束
 

@@ -2,7 +2,7 @@
 
 ## 定制目标
 
-本 fork 采用 KiCad 与嘉立创 EDA Pro 协同：KiCad 承担 Agent 可编程的原理图与 PCB 生成、ERC、DRC 和深度检查；嘉立创 EDA Pro 承担导入复核、制造规则复查、BOM/CPL/Gerber 导出和下单。
+本 fork 以嘉立创 EDA Pro 扩展作为主要操作方式：Agent 通过原理图和 PCB API 直接修改嘉立创 EDA Pro 工程，完成规则检查、制造预览、BOM/CPL/Gerber 导出和下单。KiCad 用于可选的外部分析与路由能力复用。
 
 ## 当前能力
 
@@ -11,10 +11,10 @@
 | 项目骨架 | 可用 | `jlc-eda-workflow/scripts/init_project.py` |
 | 中国大陆选型 | 可用 | 复用 `component-selecting-CN` 的 LCSC 选型思路 |
 | 数据手册与封装核对 | 可用 | 以项目 BOM、数据手册和嘉立创 EDA 元件属性为依据 |
-| KiCad 原理图与 PCB 生成 | 可用 | 复用 `draw-schematic`、`draw-pcb` 和 KiCad 工程格式 |
-| KiCad 到 EasyEDA Pro 交接 | 可用 | `prepare_kicad_handoff.py` 生成哈希、板级统计和 ERC/DRC 报告索引 |
-| 原理图与 PCB 导入复核 | GUI 流程 | 在嘉立创 EDA Pro 内导入 KiCad 快照并保留工程版本 |
-| ERC 与 DRC | 双重检查 | KiCad 先执行，嘉立创 EDA Pro 导入后再次执行 |
+| EasyEDA Pro 原理图 Agent | 开发中 | 基于 `sch_*` API 选库、放置器件、连线、写网络标签和执行 ERC |
+| EasyEDA Pro PCB Agent | 部分可用 | Design Companion 已支持 PCB 预检查、选网布线和走线回写 |
+| ERC 与 DRC | GUI 与 API | 设计主线由嘉立创 EDA Pro 执行；扩展调用 API 提取和执行规则检查 |
+| KiCad 外部验证 | 可选 | `prepare_kicad_handoff.py` 记录快照、约束和 KiCad ERC/DRC 报告 |
 | BOM/CPL/Gerber 一致性检查 | 可用 | `validate_export.py` |
 | 可选自动布线与布线前检查 | 可用 | `extensions/jlc-eda-pro-companion/` |
 | 嘉立创打样和贴片下单 | 人工复核 | 由制造预览和下单页面完成最终确认 |
@@ -23,10 +23,10 @@
 
 | 上游概念 | 嘉立创 EDA 定制实现 |
 | --- | --- |
-| `.kicad_sch` 生成 | Agent 生成的 KiCad 原理图，导入嘉立创 EDA Pro 复核 |
-| KiCad ERC | KiCad ERC 加嘉立创 EDA Pro ERC 报告与截图 |
-| `.kicad_pcb` 自动布局 | Agent 生成的 KiCad PCB，导入嘉立创 EDA Pro 后复核 |
-| KiCad DRC | KiCad DRC 加嘉立创 EDA DRC 报告与 3D/制造预览 |
+| `.kicad_sch` 生成 | 可选的离线分析快照 |
+| KiCad ERC | 可选的交叉验证 |
+| `.kicad_pcb` 自动布局 | 可选的路由和离线检查快照 |
+| KiCad DRC | 可选的交叉验证 |
 | KiCad 生产 BOM/CPL | 嘉立创 EDA 导出的 BOM 与 CPL |
 | Gerber 导出和 release | 嘉立创 EDA Gerber ZIP 加导出包校验与下单记录 |
 
@@ -41,18 +41,12 @@ py .claude/skills/jlc-eda-workflow/scripts/init_project.py led_driver_12v --goal
 
 1. 在 `Projects/led_driver_12v/PROJECT.md` 和 `constraints/board_constraints.json` 填写电压、电流、接口、尺寸、制造能力和物理约束，并运行 `validate_board_constraints.py`。
 2. 完成拓扑与元件选型，记录 LCSC 编号、数据手册、封装和替代料。
-3. 在 `kicad/` 生成原理图、PCB 并运行 KiCad ERC、DRC、审图和仿真。
-4. 生成交接清单：
-
-```powershell
-py .claude/skills/jlc-eda-workflow/scripts/prepare_kicad_handoff.py `
-  Projects/led_driver_12v --run-checks --require-complete-constraints --require-clean-checks
-```
-
-5. 将清单中记录的 KiCad 文件导入嘉立创 EDA Pro，完成 ERC、DRC、3D 和制造预览。
+3. 在嘉立创 EDA Pro 内通过 Agent 扩展生成原理图、执行 ERC、更新 PCB，再执行布局、布线和 DRC。
+4. 需要外部验证时，将快照保存到 `kicad/`，运行 `prepare_kicad_handoff.py --run-checks`，保存 KiCad 报告。
+5. 在嘉立创 EDA Pro 内完成 3D 和制造预览。
 6. 导出 BOM、CPL 和 Gerber ZIP 到 `easyeda/exports/`。
 7. 运行校验器，修复 `fail` 条目，逐项确认 `warning` 条目。
-8. 将 EasyEDA Pro 的人工变更同步到 KiCad，把最终下单文件复制到 `release/`，更新 `STATUS.md`。
+8. 将最终下单文件复制到 `release/`，更新 `STATUS.md`。
 
 ## 可选自动布线
 

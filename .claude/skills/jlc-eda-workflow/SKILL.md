@@ -5,14 +5,14 @@ description: 嘉立创 EDA PCB 工作流协调技能。用于新建嘉立创 EDA
 
 # 嘉立创 EDA 工作流
 
-本技能支持两条路径：纯嘉立创 EDA 流程，以及由 KiCad 负责 Agent 生成与深度检查、嘉立创 EDA Pro 负责导入复核和制造交付的协同流程。
+本技能以嘉立创 EDA Pro 扩展为主线：Agent 直接读写原理图和 PCB，嘉立创 EDA Pro 工程保存设计源、规则检查与制造交付。KiCad 只作为可选的外部验证或路由工具。
 
 ## 边界
 
-- 纯嘉立创 EDA 路径以 `easyeda/source/` 为工程来源，脚本只读取导出的 CSV 和 ZIP，不直接改写 EDA 工程。
-- KiCad 协同路径以 `kicad/` 中通过 ERC、DRC 和审查的 KiCad 文件为 Agent 生成源；`easyeda/source/` 保存导入后的制造镜像和版本快照。
-- 在 EasyEDA Pro 中做出的人工变更必须记录为 ECO，并在下一轮交接前同步到 KiCad，避免两个工程发生无记录分叉。
-- `draw-schematic`、`draw-pcb`、`check-schematic`、`check-pcb` 仅处理 KiCad 文件格式；只有采用 KiCad 协同路径时才调用它们。
+- `easyeda/source/` 是设计唯一来源。原理图、PCB、ERC、DRC、3D 和制造预览均在嘉立创 EDA Pro 内完成并保留工程快照。
+- `JLCEDA Design Companion` 是 PCB 自动化入口；后续 `Schematic Agent` 使用 EasyEDA Pro 的 `sch_*` API 放置器件、连线、创建网络标签并执行 ERC。
+- `kicad/` 仅保存可选的 KiCad 分析快照或外部验证工程，不能覆盖嘉立创 EDA Pro 工程。
+- `draw-schematic`、`draw-pcb`、`check-schematic`、`check-pcb` 仅在明确要求 KiCad 验证、仿真、EMC、热分析或复用 KiCadRoutingTools 时调用。
 - `component-selecting-CN` 可继续用于中国大陆选型；候选料号、LCSC 编号、数据手册链接需落到项目文档后再放入嘉立创 EDA。
 - 嘉立创 EDA 的 ERC/DRC、封装预览、3D 检查和制造预览由操作者在 GUI 中完成；检查结论记录到 `review/` 和 `STATUS.md`。
 - `extensions/jlc-eda-pro-companion/` 提供可选的 KiCadRouting 自动布线与布线前检查。它只处理明确选择的网络，完成后仍需在 GUI 中审查和执行 DRC。
@@ -31,11 +31,10 @@ py .claude/skills/jlc-eda-workflow/scripts/init_project.py buck_5v_3a --goal "12
 Projects/<name>/
   PROJECT.md          设计参数、拓扑、接口、布局约束
   STATUS.md           Phase 状态和变更记录
-  kicad/              Agent 生成的 KiCad 原理图、PCB 与项目文件
-  easyeda/source/     嘉立创 EDA 原工程与导出快照
+  easyeda/source/     嘉立创 EDA Pro 原工程与设计快照
   easyeda/exports/    BOM、CPL、Gerber ZIP
   constraints/        可机读的板级和网络级物理约束
-  handoff/            KiCad 到 EasyEDA Pro 的交接清单和检查报告
+  handoff/            可选 KiCad 验证和交接清单
   datasheets/         数据手册与选型证据
   review/             ERC、DRC、导出审查记录
   release/            经确认后的下单包
@@ -49,19 +48,18 @@ Projects/<name>/
 | 1 | 讨论拓扑、接口、功耗与风险 | 项目参数、连接表、关键计算 |
 | 2 | 以 LCSC 为主完成可采购选型 | 候选表、LCSC 编号、替代料 |
 | 2.5 | 用数据手册核对封装、引脚与额定值 | 数据手册证据、确认后的采购 BOM |
-| 3 | 生成 KiCad 原理图并执行 ERC；导入 EasyEDA Pro 后执行 ERC | KiCad 原理图、EasyEDA 快照、ERC 记录 |
+| 3 | 通过 EasyEDA Pro 原理图 API 生成图纸并执行 ERC | EasyEDA 原理图、ERC 记录 |
 | 3.5 | 审核网络、去耦、极性、接口和关键参数 | `review/schematic_review.md` |
-| 4 | 生成 KiCad PCB 并执行 DRC；导入 EasyEDA Pro 后复核和可选自动布线 | KiCad PCB、PCB 工程、预检查结果、3D/DRC 截图 |
+| 4 | 通过 EasyEDA Pro PCB API 布局、布线并执行 DRC | PCB 工程、预检查结果、3D/DRC 截图 |
 | 4.5 | 导出并核对 BOM、CPL、Gerber | `review/export_validation.json` |
 | 5 | 在嘉立创下单页面复核工艺、拼板和贴片选项 | `release/` 下单记录 |
 
 每个 Phase 完成或回退时，更新 `STATUS.md` 的状态和变更记录。严重问题必须回到对应上游阶段处理。
 
-## KiCad 协同交接
+## 可选 KiCad 验证
 
-1. 在 `kicad/` 使用 `draw-schematic`、`check-schematic`、`draw-pcb` 和 `check-pcb` 完成生成与检查。
-2. 在 `constraints/board_constraints.json` 记录板框、层数、工厂能力、网络类别、差分对和区域约束。
-3. 先验证物理约束文件：
+1. 在 `constraints/board_constraints.json` 记录板框、层数、工厂能力、网络类别、差分对和区域约束。
+2. 先验证物理约束文件：
 
 ```powershell
 py .claude/skills/jlc-eda-workflow/scripts/validate_board_constraints.py `
@@ -69,15 +67,14 @@ py .claude/skills/jlc-eda-workflow/scripts/validate_board_constraints.py `
   --output Projects/<name>/review/constraint_validation.json
 ```
 
-4. 运行以下命令生成可追溯交接清单，并在安装 KiCad 的机器上执行 ERC 和 DRC：
+3. 需要 KiCad 的 EMC、热、SPICE、寄生参数分析或离线审查时，将 EasyEDA Pro 导出的快照保存到 `kicad/`，运行以下命令：
 
 ```powershell
 py .claude/skills/jlc-eda-workflow/scripts/prepare_kicad_handoff.py `
   Projects/<name> --run-checks --require-complete-constraints --require-clean-checks
 ```
 
-5. 将 `handoff/kicad_to_easyeda.json` 中记录的 `.kicad_sch` 和 `.kicad_pcb` 导入 EasyEDA Pro，重新执行 EasyEDA Pro 的 ERC、DRC 和制造预览。
-6. EasyEDA Pro 中的人工修改写入 ECO 记录，并同步到 KiCad 后再生成下一份交接清单。
+4. KiCad 报告写入 `handoff/` 和 `review/`，作为对 EasyEDA Pro ERC/DRC 的补充证据。主工程继续保留在 `easyeda/source/`。
 
 ## 导出包校验
 
