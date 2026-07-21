@@ -23,8 +23,323 @@ var edaEsbuildExportName = (() => {
   __export(src_exports, {
     about: () => about,
     autoRouteAll: () => autoRouteAll,
+    openSchematicAgent: () => openSchematicAgent,
     runBoardPreflight: () => runBoardPreflight
   });
+
+  // src/schematic_agent.ts
+  var MAX_COMPONENTS = 128;
+  var MAX_WIRES = 256;
+  var MAX_AUXILIARY_PRIMITIVES = 128;
+  var MAX_COORDINATE = 1e6;
+  var LCSC_ID = /^C\d+$/;
+  var IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]*$/;
+  var NET_NAME = /^[A-Za-z0-9_+\-./]+$/;
+  function isRecord(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function isFiniteCoordinate(value) {
+    return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= MAX_COORDINATE;
+  }
+  function isOptionalBoolean(value) {
+    return value === void 0 || typeof value === "boolean";
+  }
+  function isOptionalRotation(value) {
+    return value === void 0 || isFiniteCoordinate(value);
+  }
+  function isText(value, maxLength = 180) {
+    return typeof value === "string" && value.length > 0 && value.length <= maxLength;
+  }
+  function isValidNetName(value) {
+    return isText(value, 120) && NET_NAME.test(value);
+  }
+  function addOptionalStringErrors(value, field, errors) {
+    if (value[field] !== void 0 && !isText(value[field])) {
+      errors.push(`${field} must be a non-empty string no longer than 180 characters`);
+    }
+  }
+  function getPlanArray(plan, field, errors) {
+    const value = plan[field];
+    if (value === void 0) return [];
+    if (!Array.isArray(value)) {
+      errors.push(`${field} must be an array`);
+      return [];
+    }
+    return value;
+  }
+  function validateSchematicPlan(rawPlan) {
+    const errors = [];
+    const warnings = [];
+    if (!isRecord(rawPlan)) {
+      return { ok: false, errors: ["Plan must be a JSON object"], warnings };
+    }
+    if (rawPlan.version !== 1) errors.push("version must be 1");
+    const rawComponents = getPlanArray(rawPlan, "components", errors);
+    const rawWires = getPlanArray(rawPlan, "wires", errors);
+    const rawNetFlags = getPlanArray(rawPlan, "net_flags", errors);
+    const rawNetPorts = getPlanArray(rawPlan, "net_ports", errors);
+    if (rawComponents.length > MAX_COMPONENTS) errors.push(`components cannot exceed ${MAX_COMPONENTS}`);
+    if (rawWires.length > MAX_WIRES) errors.push(`wires cannot exceed ${MAX_WIRES}`);
+    if (rawNetFlags.length + rawNetPorts.length > MAX_AUXILIARY_PRIMITIVES) {
+      errors.push(`net_flags and net_ports combined cannot exceed ${MAX_AUXILIARY_PRIMITIVES}`);
+    }
+    if (!isOptionalBoolean(rawPlan.run_erc)) errors.push("run_erc must be a boolean");
+    if (!isOptionalBoolean(rawPlan.save)) errors.push("save must be a boolean");
+    const components = [];
+    const usedIds = /* @__PURE__ */ new Set();
+    const usedDesignators = /* @__PURE__ */ new Set();
+    for (const [index, rawComponent] of rawComponents.entries()) {
+      const prefix = `components[${index}]`;
+      if (!isRecord(rawComponent)) {
+        errors.push(`${prefix} must be an object`);
+        continue;
+      }
+      let componentId;
+      if (!isText(rawComponent.id, 80) || !IDENTIFIER.test(rawComponent.id)) {
+        errors.push(`${prefix}.id must use letters, digits, and underscores`);
+      } else if (usedIds.has(rawComponent.id)) {
+        errors.push(`${prefix}.id duplicates ${rawComponent.id}`);
+      } else {
+        componentId = rawComponent.id;
+        usedIds.add(rawComponent.id);
+      }
+      if (!isText(rawComponent.lcsc_id, 40) || !LCSC_ID.test(rawComponent.lcsc_id)) {
+        errors.push(`${prefix}.lcsc_id must be an LCSC C number`);
+      }
+      if (!isFiniteCoordinate(rawComponent.x) || !isFiniteCoordinate(rawComponent.y)) {
+        errors.push(`${prefix}.x and ${prefix}.y must be finite coordinates`);
+      }
+      if (!isOptionalRotation(rawComponent.rotation)) errors.push(`${prefix}.rotation must be a finite number`);
+      if (!isOptionalBoolean(rawComponent.mirror)) errors.push(`${prefix}.mirror must be a boolean`);
+      if (!isOptionalBoolean(rawComponent.add_into_bom)) errors.push(`${prefix}.add_into_bom must be a boolean`);
+      if (!isOptionalBoolean(rawComponent.add_into_pcb)) errors.push(`${prefix}.add_into_pcb must be a boolean`);
+      addOptionalStringErrors(rawComponent, "name", errors);
+      addOptionalStringErrors(rawComponent, "manufacturer", errors);
+      addOptionalStringErrors(rawComponent, "manufacturer_id", errors);
+      addOptionalStringErrors(rawComponent, "supplier", errors);
+      const plannedDesignator = rawComponent.designator ?? componentId;
+      if (plannedDesignator !== void 0) {
+        if (!isText(plannedDesignator, 80) || !IDENTIFIER.test(plannedDesignator)) {
+          errors.push(`${prefix}.designator must use letters, digits, and underscores`);
+        } else if (usedDesignators.has(plannedDesignator)) {
+          errors.push(`${prefix}.designator duplicates ${plannedDesignator}`);
+        } else {
+          usedDesignators.add(plannedDesignator);
+        }
+      }
+      components.push(rawComponent);
+    }
+    const wires = [];
+    for (const [index, rawWire] of rawWires.entries()) {
+      const prefix = `wires[${index}]`;
+      if (!isRecord(rawWire)) {
+        errors.push(`${prefix} must be an object`);
+        continue;
+      }
+      if (!isValidNetName(rawWire.net)) errors.push(`${prefix}.net contains unsupported characters`);
+      if (!Array.isArray(rawWire.points) || rawWire.points.length < 2) {
+        errors.push(`${prefix}.points must contain at least two coordinate pairs`);
+        continue;
+      }
+      for (const [pointIndex, rawPoint] of rawWire.points.entries()) {
+        if (!Array.isArray(rawPoint) || rawPoint.length !== 2 || !isFiniteCoordinate(rawPoint[0]) || !isFiniteCoordinate(rawPoint[1])) {
+          errors.push(`${prefix}.points[${pointIndex}] must be [x, y] finite coordinates`);
+        }
+      }
+      wires.push(rawWire);
+    }
+    const netFlags = [];
+    for (const [index, rawFlag] of rawNetFlags.entries()) {
+      const prefix = `net_flags[${index}]`;
+      if (!isRecord(rawFlag)) {
+        errors.push(`${prefix} must be an object`);
+        continue;
+      }
+      if (!["Power", "Ground", "AnalogGround", "ProtectGround"].includes(String(rawFlag.kind))) {
+        errors.push(`${prefix}.kind is unsupported`);
+      }
+      if (!isValidNetName(rawFlag.net)) errors.push(`${prefix}.net contains unsupported characters`);
+      if (!isFiniteCoordinate(rawFlag.x) || !isFiniteCoordinate(rawFlag.y)) errors.push(`${prefix}.x and ${prefix}.y must be finite coordinates`);
+      if (!isOptionalRotation(rawFlag.rotation)) errors.push(`${prefix}.rotation must be a finite number`);
+      if (!isOptionalBoolean(rawFlag.mirror)) errors.push(`${prefix}.mirror must be a boolean`);
+      netFlags.push(rawFlag);
+    }
+    const netPorts = [];
+    for (const [index, rawPort] of rawNetPorts.entries()) {
+      const prefix = `net_ports[${index}]`;
+      if (!isRecord(rawPort)) {
+        errors.push(`${prefix} must be an object`);
+        continue;
+      }
+      if (!["IN", "OUT", "BI"].includes(String(rawPort.direction))) errors.push(`${prefix}.direction is unsupported`);
+      if (!isValidNetName(rawPort.net)) errors.push(`${prefix}.net contains unsupported characters`);
+      if (!isFiniteCoordinate(rawPort.x) || !isFiniteCoordinate(rawPort.y)) errors.push(`${prefix}.x and ${prefix}.y must be finite coordinates`);
+      if (!isOptionalRotation(rawPort.rotation)) errors.push(`${prefix}.rotation must be a finite number`);
+      if (!isOptionalBoolean(rawPort.mirror)) errors.push(`${prefix}.mirror must be a boolean`);
+      netPorts.push(rawPort);
+    }
+    if (components.length === 0) warnings.push("Plan contains no components");
+    if (wires.length === 0) warnings.push("Plan contains no wires");
+    if (netFlags.length === 0 && netPorts.length === 0) warnings.push("Plan contains no net flags or ports");
+    if (errors.length > 0) return { ok: false, errors, warnings };
+    return {
+      ok: true,
+      plan: {
+        version: 1,
+        components,
+        wires,
+        net_flags: netFlags,
+        net_ports: netPorts,
+        run_erc: rawPlan.run_erc !== false,
+        save: rawPlan.save !== false
+      },
+      errors,
+      warnings
+    };
+  }
+  function summarizeSchematicPlan(rawPlan) {
+    const validation = validateSchematicPlan(rawPlan);
+    if (!validation.plan) return validation;
+    return {
+      ...validation,
+      summary: {
+        components: validation.plan.components.length,
+        wires: validation.plan.wires?.length ?? 0,
+        net_flags: validation.plan.net_flags?.length ?? 0,
+        net_ports: validation.plan.net_ports?.length ?? 0
+      }
+    };
+  }
+  function getPrimitiveId(primitive) {
+    if (primitive && typeof primitive.getState_PrimitiveId === "function") return primitive.getState_PrimitiveId();
+    return primitive?.primitiveId ?? primitive?.id;
+  }
+  function flattenWirePoints(points) {
+    return points.flatMap(([x, y]) => [x, y]);
+  }
+  function requireSchematicApi(edaApi) {
+    if (!edaApi?.lib_Device?.getByLcscIds || !edaApi?.sch_PrimitiveComponent?.create || !edaApi?.sch_PrimitiveWire?.create) {
+      throw new Error("The current EasyEDA Pro version does not expose the required schematic extension APIs");
+    }
+  }
+  async function resolveComponent(edaApi, lcscId) {
+    const result = await edaApi.lib_Device.getByLcscIds(lcscId);
+    const items = Array.isArray(result) ? result : result ? [result] : [];
+    return items.find((item) => item?.uuid && item?.libraryUuid);
+  }
+  async function rollbackCreatedPrimitives(edaApi, created) {
+    let succeeded = true;
+    for (const item of [...created].reverse()) {
+      try {
+        const primitiveId = getPrimitiveId(item.primitive);
+        const deleted = await item.api.delete(primitiveId ?? item.primitive);
+        if (!deleted) succeeded = false;
+      } catch {
+        succeeded = false;
+      }
+    }
+    return succeeded;
+  }
+  async function applySchematicPlan(edaApi, rawPlan) {
+    const validation = validateSchematicPlan(rawPlan);
+    const emptyCreated = { components: 0, wires: 0, net_flags: 0, net_ports: 0 };
+    if (!validation.ok || !validation.plan) {
+      return {
+        ok: false,
+        created: emptyCreated,
+        resolved_components: [],
+        errors: validation.errors,
+        warnings: validation.warnings,
+        rollback_attempted: false
+      };
+    }
+    const result = {
+      ok: false,
+      created: emptyCreated,
+      resolved_components: [],
+      errors: [],
+      warnings: [...validation.warnings],
+      rollback_attempted: false
+    };
+    const created = [];
+    try {
+      requireSchematicApi(edaApi);
+      const resolved = /* @__PURE__ */ new Map();
+      for (const component of validation.plan.components) {
+        const device = await resolveComponent(edaApi, component.lcsc_id);
+        if (!device) throw new Error(`${component.id}: LCSC part ${component.lcsc_id} is unavailable in the EasyEDA Pro library`);
+        resolved.set(component.id, device);
+        result.resolved_components.push({ id: component.id, lcsc_id: component.lcsc_id, device_name: String(device.name ?? component.lcsc_id) });
+      }
+      for (const component of validation.plan.components) {
+        const device = resolved.get(component.id);
+        const primitive = await edaApi.sch_PrimitiveComponent.create(
+          device,
+          component.x,
+          component.y,
+          void 0,
+          component.rotation ?? 0,
+          component.mirror ?? false,
+          component.add_into_bom ?? true,
+          component.add_into_pcb ?? true
+        );
+        if (!primitive) throw new Error(`${component.id}: EasyEDA Pro rejected component placement`);
+        created.push({ api: edaApi.sch_PrimitiveComponent, primitive });
+        const property = {
+          designator: component.designator ?? component.id,
+          addIntoBom: component.add_into_bom ?? true,
+          addIntoPcb: component.add_into_pcb ?? true,
+          supplierId: component.lcsc_id
+        };
+        if (component.name !== void 0) property.name = component.name;
+        if (component.manufacturer !== void 0) property.manufacturer = component.manufacturer;
+        if (component.manufacturer_id !== void 0) property.manufacturerId = component.manufacturer_id;
+        if (component.supplier !== void 0) property.supplier = component.supplier;
+        const updated = await edaApi.sch_PrimitiveComponent.modify(primitive, property);
+        if (!updated) throw new Error(`${component.id}: EasyEDA Pro rejected component properties`);
+        result.created.components += 1;
+      }
+      for (const wire of validation.plan.wires ?? []) {
+        const primitive = await edaApi.sch_PrimitiveWire.create(flattenWirePoints(wire.points), wire.net, null, null, null);
+        if (!primitive) throw new Error(`Wire for net ${wire.net} was rejected`);
+        created.push({ api: edaApi.sch_PrimitiveWire, primitive });
+        result.created.wires += 1;
+      }
+      for (const flag of validation.plan.net_flags ?? []) {
+        const primitive = await edaApi.sch_PrimitiveComponent.createNetFlag(flag.kind, flag.net, flag.x, flag.y, flag.rotation ?? 0, flag.mirror ?? false);
+        if (!primitive) throw new Error(`Net flag for ${flag.net} was rejected`);
+        created.push({ api: edaApi.sch_PrimitiveComponent, primitive });
+        result.created.net_flags += 1;
+      }
+      for (const port of validation.plan.net_ports ?? []) {
+        const primitive = await edaApi.sch_PrimitiveComponent.createNetPort(port.direction, port.net, port.x, port.y, port.rotation ?? 0, port.mirror ?? false);
+        if (!primitive) throw new Error(`Net port for ${port.net} was rejected`);
+        created.push({ api: edaApi.sch_PrimitiveComponent, primitive });
+        result.created.net_ports += 1;
+      }
+      if (validation.plan.run_erc && edaApi.sch_Drc?.check) {
+        result.erc = { passed: await edaApi.sch_Drc.check(true, false) };
+        if (!result.erc.passed) result.warnings.push("ERC returned warnings or errors; review the EasyEDA Pro DRC panel before PCB transfer");
+      }
+      if (edaApi.sch_Netlist?.getNetlist) result.netlist = await edaApi.sch_Netlist.getNetlist();
+      if (validation.plan.save) {
+        result.saved = await edaApi.sch_Document.save();
+        if (!result.saved) throw new Error("EasyEDA Pro could not save the schematic document");
+      }
+      result.ok = true;
+      return result;
+    } catch (error) {
+      result.errors.push(error instanceof Error ? error.message : String(error));
+      if (created.length > 0) {
+        result.rollback_attempted = true;
+        result.rollback_succeeded = await rollbackCreatedPrimitives(edaApi, created);
+        if (!result.rollback_succeeded) result.warnings.push("Rollback did not remove every created primitive; inspect the active schematic before retrying");
+      }
+      return result;
+    }
+  }
+
+  // src/index.ts
   var uuid = "f7a6e2e44d4a4a2a9e3d65d84a1d5c71";
   var _G = globalThis;
   var _bridgeInitDone = !!_G.__jlcEdaCompanionLoaded;
@@ -606,7 +921,7 @@ var edaEsbuildExportName = (() => {
         dia
       );
     });
-    return { tracksCreated, viasCreated };
+    return { tracksCreated, viasCreated, tracksRemoved };
   }
   function sendToIframe(topic, data) {
     const fullTopic = MSG_PREFIX + topic;
@@ -628,6 +943,7 @@ var edaEsbuildExportName = (() => {
   }
   var currentJobId = _G.__jlcEdaCompanionJobId ?? null;
   var isRoutingInProgress = _G.__jlcEdaCompanionRouting ?? false;
+  var isSchematicOperationInProgress = false;
   var _generation = (_G.__jlcEdaCompanionGeneration ?? 0) + 1;
   _G.__jlcEdaCompanionGeneration = _generation;
   _G.__jlcEdaCompanionLoaded = true;
@@ -971,9 +1287,45 @@ var edaEsbuildExportName = (() => {
       sendToIframe("drc-limits", {});
     }
   });
+  onIframeMessage("schematic-plan-validate", (data) => {
+    if (_G.__jlcEdaCompanionGeneration !== _generation) return;
+    const validation = summarizeSchematicPlan(data?.plan);
+    sendToIframe("schematic-plan-validation", validation);
+  });
+  onIframeMessage("schematic-plan-apply", async (data) => {
+    if (_G.__jlcEdaCompanionGeneration !== _generation) return;
+    if (isSchematicOperationInProgress) {
+      sendToIframe("schematic-plan-result", {
+        ok: false,
+        created: { components: 0, wires: 0, net_flags: 0, net_ports: 0 },
+        resolved_components: [],
+        errors: ["A schematic operation is already running"],
+        warnings: [],
+        rollback_attempted: false
+      });
+      return;
+    }
+    isSchematicOperationInProgress = true;
+    try {
+      const result = await applySchematicPlan(eda, data?.plan);
+      sendToIframe("schematic-plan-result", result);
+    } catch (error) {
+      sendToIframe("schematic-plan-result", {
+        ok: false,
+        created: { components: 0, wires: 0, net_flags: 0, net_ports: 0 },
+        resolved_components: [],
+        errors: [error instanceof Error ? error.message : String(error)],
+        warnings: [],
+        rollback_attempted: false
+      });
+    } finally {
+      isSchematicOperationInProgress = false;
+    }
+  });
   var IFRAME_ID = "jlc-eda-routing-dialog";
   var SERVICE_DIALOG_ID = "jlc-eda-service-not-found";
   var PREFLIGHT_DIALOG_ID = "jlc-eda-design-preflight";
+  var SCHEMATIC_AGENT_DIALOG_ID = "jlc-eda-schematic-agent";
   var latestPreflight = null;
   function showServiceNotFoundDialog() {
     try {
@@ -1028,6 +1380,20 @@ var edaEsbuildExportName = (() => {
       );
     }
   }
+  async function openSchematicAgent() {
+    try {
+      await eda.sys_IFrame.openIFrame("/iframe/schematic-agent.html", 880, 680, SCHEMATIC_AGENT_DIALOG_ID, {
+        maximizeButton: true,
+        minimizeButton: true,
+        grayscaleMask: true
+      });
+    } catch (e) {
+      eda.sys_Dialog.showInformationMessage(
+        `Failed to open schematic agent: ${e?.message ?? e}`,
+        "JLCEDA Design Companion"
+      );
+    }
+  }
   async function autoRouteAll() {
     const client = new BridgeClient();
     const serverOk = await client.checkServer();
@@ -1076,10 +1442,10 @@ var edaEsbuildExportName = (() => {
   });
   function about() {
     eda.sys_Dialog.showInformationMessage(
-      `JLCEDA Design Companion v0.1.0
+      `JLCEDA Design Companion v0.2.0
 
 Open-source EasyEDA Pro companion built on KiRouting Integration.
-Includes safe routing workflows and board preflight review.
+Includes plan-driven schematic generation, safe routing workflows, and board preflight review.
 
 Bridge server: http://${BRIDGE_CONFIG.host}:${BRIDGE_CONFIG.port}`,
       t("About")

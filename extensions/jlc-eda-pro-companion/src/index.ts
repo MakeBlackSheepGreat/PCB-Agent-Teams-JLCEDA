@@ -1,3 +1,5 @@
+import { applySchematicPlan, summarizeSchematicPlan } from './schematic_agent';
+
 const uuid = 'f7a6e2e44d4a4a2a9e3d65d84a1d5c71';
 const _G = globalThis as any;
 const _bridgeInitDone = !!_G.__jlcEdaCompanionLoaded;
@@ -586,7 +588,7 @@ async function applyResults(result: any, netsToRoute: string[], unitsMm: boolean
 		);
 	});
 
-	return { tracksCreated, viasCreated };
+	return { tracksCreated, viasCreated, tracksRemoved };
 }
 
 // ─── MessageBus Communication with iframe ───
@@ -615,6 +617,7 @@ function onIframeMessage(topic: string, handler: (data: any) => void): void {
 
 let currentJobId: string | null = _G.__jlcEdaCompanionJobId ?? null;
 let isRoutingInProgress = _G.__jlcEdaCompanionRouting ?? false;
+let isSchematicOperationInProgress = false;
 
 const _generation = (_G.__jlcEdaCompanionGeneration ?? 0) + 1;
 _G.__jlcEdaCompanionGeneration = _generation;
@@ -1000,11 +1003,49 @@ onIframeMessage('get-drc-limits', async () => {
 });
 
 
+onIframeMessage('schematic-plan-validate', (data: any) => {
+	if (_G.__jlcEdaCompanionGeneration !== _generation) return;
+	const validation = summarizeSchematicPlan(data?.plan);
+	sendToIframe('schematic-plan-validation', validation);
+});
+
+onIframeMessage('schematic-plan-apply', async (data: any) => {
+	if (_G.__jlcEdaCompanionGeneration !== _generation) return;
+	if (isSchematicOperationInProgress) {
+		sendToIframe('schematic-plan-result', {
+			ok: false,
+			created: { components: 0, wires: 0, net_flags: 0, net_ports: 0 },
+			resolved_components: [],
+			errors: ['A schematic operation is already running'],
+			warnings: [],
+			rollback_attempted: false,
+		});
+		return;
+	}
+	isSchematicOperationInProgress = true;
+	try {
+		const result = await applySchematicPlan(eda, data?.plan);
+		sendToIframe('schematic-plan-result', result);
+	} catch (error: unknown) {
+		sendToIframe('schematic-plan-result', {
+			ok: false,
+			created: { components: 0, wires: 0, net_flags: 0, net_ports: 0 },
+			resolved_components: [],
+			errors: [error instanceof Error ? error.message : String(error)],
+			warnings: [],
+			rollback_attempted: false,
+		});
+	} finally {
+		isSchematicOperationInProgress = false;
+	}
+});
+
 // ─── Menu Functions ───
 
 const IFRAME_ID = 'jlc-eda-routing-dialog';
 const SERVICE_DIALOG_ID = 'jlc-eda-service-not-found';
 const PREFLIGHT_DIALOG_ID = 'jlc-eda-design-preflight';
+const SCHEMATIC_AGENT_DIALOG_ID = 'jlc-eda-schematic-agent';
 let latestPreflight: any | null = null;
 
 function showServiceNotFoundDialog(): void {
@@ -1065,6 +1106,21 @@ async function openPreflightDialog(): Promise<void> {
 	}
 }
 
+export async function openSchematicAgent(): Promise<void> {
+	try {
+		await eda.sys_IFrame.openIFrame('/iframe/schematic-agent.html', 880, 680, SCHEMATIC_AGENT_DIALOG_ID, {
+			maximizeButton: true,
+			minimizeButton: true,
+			grayscaleMask: true,
+		});
+	} catch (e: any) {
+		eda.sys_Dialog.showInformationMessage(
+			`Failed to open schematic agent: ${e?.message ?? e}`,
+			'JLCEDA Design Companion',
+		);
+	}
+}
+
 export async function autoRouteAll(): Promise<void> {
 	const client = new BridgeClient();
 	const serverOk = await client.checkServer();
@@ -1115,9 +1171,9 @@ onIframeMessage('retry-connection', async () => {
 
 export function about(): void {
 	eda.sys_Dialog.showInformationMessage(
-		'JLCEDA Design Companion v0.1.0\n\n' +
+		'JLCEDA Design Companion v0.2.0\n\n' +
 		'Open-source EasyEDA Pro companion built on KiRouting Integration.\n' +
-		'Includes safe routing workflows and board preflight review.\n\n' +
+		'Includes plan-driven schematic generation, safe routing workflows, and board preflight review.\n\n' +
 		`Bridge server: http://${BRIDGE_CONFIG.host}:${BRIDGE_CONFIG.port}`,
 		t('About'),
 	);

@@ -11,7 +11,7 @@
 | 项目骨架 | 可用 | `jlc-eda-workflow/scripts/init_project.py` |
 | 中国大陆选型 | 可用 | 复用 `component-selecting-CN` 的 LCSC 选型思路 |
 | 数据手册与封装核对 | 可用 | 以项目 BOM、数据手册和嘉立创 EDA 元件属性为依据 |
-| EasyEDA Pro 原理图 Agent | 开发中 | 基于 `sch_*` API 选库、放置器件、连线、写网络标签和执行 ERC |
+| EasyEDA Pro 原理图 Agent | Beta 可用 | 在扩展中验证 JSON 计划，按 LCSC 编号选库、放置器件、连线、写网络标签、执行 ERC、读取网表并保存 |
 | EasyEDA Pro PCB Agent | 部分可用 | Design Companion 已支持 PCB 预检查、选网布线和走线回写 |
 | ERC 与 DRC | GUI 与 API | 设计主线由嘉立创 EDA Pro 执行；扩展调用 API 提取和执行规则检查 |
 | KiCad 外部验证 | 可选 | `prepare_kicad_handoff.py` 记录快照、约束和 KiCad ERC/DRC 报告 |
@@ -41,7 +41,7 @@ py .claude/skills/jlc-eda-workflow/scripts/init_project.py led_driver_12v --goal
 
 1. 在 `Projects/led_driver_12v/PROJECT.md` 和 `constraints/board_constraints.json` 填写电压、电流、接口、尺寸、制造能力和物理约束，并运行 `validate_board_constraints.py`。
 2. 完成拓扑与元件选型，记录 LCSC 编号、数据手册、封装和替代料。
-3. 在嘉立创 EDA Pro 内通过 Agent 扩展生成原理图、执行 ERC、更新 PCB，再执行布局、布线和 DRC。
+3. 由 Agent 生成经选型和约束核对的 JSON 设计计划，在原理图 Agent 中验证并执行，审查 ERC 后更新 PCB，再执行布局、布线和 DRC。
 4. 需要外部验证时，将快照保存到 `kicad/`，运行 `prepare_kicad_handoff.py --run-checks`，保存 KiCad 报告。
 5. 在嘉立创 EDA Pro 内完成 3D 和制造预览。
 6. 导出 BOM、CPL 和 Gerber ZIP 到 `easyeda/exports/`。
@@ -50,9 +50,9 @@ py .claude/skills/jlc-eda-workflow/scripts/init_project.py led_driver_12v --goal
 
 ## 可选自动布线
 
-`extensions/jlc-eda-pro-companion/` 是本 fork 自制的 EasyEDA Pro 扩展。它继承 KiRouting Integration 的本地桥接结构，通过 KiCadRoutingTools 对选定网络自动布线，并增加布线前检查和默认保留已有铜箔的保护策略。
+`extensions/jlc-eda-pro-companion/` 是本 fork 自制的 EasyEDA Pro 扩展。它在原理图编辑器执行可审查的设计计划，在 PCB 编辑器通过 KiCadRoutingTools 对选定网络自动布线，并增加布线前检查和默认保留已有铜箔的保护策略。
 
-在图纸摆件、板框、层叠和规则已经确认后，启动 `extensions/jlc-eda-pro-companion/bridge_server/start_server.bat`，在 EasyEDA Pro 中开启“外部交互”，安装构建得到的 `.eext`。自动布线结束后必须回到 EasyEDA Pro 进行走线审查和 DRC。
+在原理图中先完成设计计划的验证、执行和 ERC 审查。图纸摆件、板框、层叠和规则确认后，启动 `extensions/jlc-eda-pro-companion/bridge_server/start_server.bat`，在 EasyEDA Pro 中开启“外部交互”，安装构建得到的 `.eext`。自动布线结束后必须回到 EasyEDA Pro 进行走线审查和 DRC。完整模块边界见 [docs/JLCEDA_EXTENSION_ARCHITECTURE.md](docs/JLCEDA_EXTENSION_ARCHITECTURE.md)。
 
 ## 导出校验
 

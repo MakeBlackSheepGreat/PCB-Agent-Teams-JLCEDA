@@ -2,8 +2,8 @@
 	"name": "jlc-eda-design-companion",
 	"uuid": "f7a6e2e44d4a4a2a9e3d65d84a1d5c71",
 	"displayName": "JLCEDA Design Companion",
-	"description": "嘉立创 EDA Pro 的本地设计协同工具，提供 KiCadRouting 自动布线、布线前检查和板卡数据审查",
-	"version": "0.1.0",
+	"description": "嘉立创 EDA Pro 的本地设计协同工具，提供可审查的原理图生成、自动布线、布线前检查和板卡数据审查",
+	"version": "0.2.0",
 	"publisher": "MakeBlackSheepGreat",
 	"engines": {
 		"eda": "^3.2.0"
@@ -21,11 +21,30 @@
 	"homepage": "https://github.com/MakeBlackSheepGreat/PCB-Agent-Teams-JLCEDA",
 	"bugs": "https://github.com/MakeBlackSheepGreat/PCB-Agent-Teams-JLCEDA/issues",
 	"activationEvents": {
-		"onEditorPcb": true
+		"onEditorPcb": true,
+		"onEditorSch": true
 	},
 	"entry": "./dist/index",
 	"dependentExtensions": {},
 	"headerMenus": {
+		"sch": [
+			{
+				"id": "JlcEdaSchematicAgent",
+				"title": "JLCEDA Design Companion",
+				"menuItems": [
+					{
+						"id": "OpenSchematicAgent",
+						"title": "打开原理图 Agent...",
+						"registerFn": "openSchematicAgent"
+					},
+					{
+						"id": "AboutSchematic",
+						"title": "关于...",
+						"registerFn": "about"
+					}
+				]
+			}
+		],
 		"pcb": [
 			{
 				"id": "JlcEdaDesignCompanion",

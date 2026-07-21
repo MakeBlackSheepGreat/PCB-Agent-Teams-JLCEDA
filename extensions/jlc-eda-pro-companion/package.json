@@ -1,11 +1,12 @@
 {
 	"name": "jlc-eda-design-companion",
-	"version": "0.1.0",
-	"description": "嘉立创 EDA Pro 本地设计协同扩展：自动布线、布线前检查和板卡审查",
+	"version": "0.2.0",
+	"description": "嘉立创 EDA Pro 本地设计协同扩展：原理图计划执行、自动布线、布线前检查和板卡审查",
 	"author": "MakeBlackSheepGreat",
 	"license": "Apache-2.0",
 	"scripts": {
 		"compile": "rimraf ./dist/ && ts-node ./config/esbuild.prod.ts",
+		"test:schematic": "node -r ts-node/register tests/schematic_agent.test.ts",
 		"prepare": "husky",
 		"prettier:all": "prettier --write .",
 		"eslint:all": "eslint --ext .ts --fix .",

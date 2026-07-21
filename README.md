@@ -102,7 +102,7 @@ Each skill is a standalone toolbox, **not a mandatory pipeline**. At any stage y
 4. 需要外部仿真、EMC、热分析或离线审查时，再生成 KiCad 快照和报告。
 5. 将 BOM、CPL、Gerber ZIP 放入项目的 `easyeda/exports/`，运行 `validate_export.py` 后进入打样或 SMT 下单页面。
 
-可选的 `extensions/jlc-eda-pro-companion/` 提供 EasyEDA Pro 自动布线和布线前检查，复用 KiCadRoutingTools 的 A* 引擎。它默认保留已有铜箔，完成后仍需在 EasyEDA Pro 中执行 DRC。
+`extensions/jlc-eda-pro-companion/` 提供 EasyEDA Pro 原理图设计计划执行、自动布线和布线前检查。原理图 Agent 根据 LCSC 编号解析器件，放置元件、连线、写网络标识、运行 ERC 并保存；PCB 自动布线复用 KiCadRoutingTools 的 A* 引擎，默认保留已有铜箔，完成后仍需在 EasyEDA Pro 中执行 DRC。完整架构见 [docs/JLCEDA_EXTENSION_ARCHITECTURE.md](docs/JLCEDA_EXTENSION_ARCHITECTURE.md)。
 
 新建项目：
 
