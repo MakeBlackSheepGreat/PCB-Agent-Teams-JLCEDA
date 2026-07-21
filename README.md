@@ -1,6 +1,6 @@
 # PCB-Agent-Teams-JLCEDA — 嘉立创 EDA 与 KiCad PCB 工作流
 
-> 此 fork 新增 `jlc-eda-workflow`：保留上游 Phase 0-5、选型 gate、审查和制造交付思路，使用嘉立创 EDA GUI 绘制图纸并校验其导出的 BOM、CPL、Gerber。详见 [嘉立创 EDA 工作流](JLCEDA_WORKFLOW.md)。
+> 此 fork 新增 `jlc-eda-workflow`：复用 KiCad 的可编程原理图/PCB 生成与深度检查，再交接给嘉立创 EDA Pro 做导入复核、制造文件导出和下单。详见 [嘉立创 EDA 工作流](JLCEDA_WORKFLOW.md)。
 
 > 上游 KiCad 工作流及其 10 个原始 skills 仍完整保留，方便对照流程与后续自动化研究。
 
@@ -96,11 +96,11 @@ Each skill is a standalone toolbox, **not a mandatory pipeline**. At any stage y
 
 `jlc-eda-workflow` 是此 fork 的新增入口，适合以嘉立创 EDA 为主的设计者：
 
-1. 用 `jlc-eda-workflow` 的项目初始化脚本创建骨架，保存参数、选型证据和状态记录。
-2. 在嘉立创 EDA GUI 内完成原理图、PCB、ERC、DRC、3D 预览和制造预览。
-3. 将 BOM、CPL、Gerber ZIP 放入项目的 `easyeda/exports/`。
-4. 运行 `jlc-eda-workflow/scripts/validate_export.py`，核对位号、坐标、层、旋转和 Gerber 文件结构。
-5. 通过导出检查后再进入嘉立创打样或 SMT 下单页面。
+1. 用 `jlc-eda-workflow` 的项目初始化脚本创建骨架，保存参数、选型证据、物理约束和状态记录。
+2. 在 `kicad/` 内调用 KiCad skills 完成原理图、PCB、ERC、DRC 和深度检查。
+3. 运行 `prepare_kicad_handoff.py`，记录经审查 KiCad 文件的哈希、板级统计和检查报告。
+4. 在嘉立创 EDA Pro 内导入该快照，执行 ERC、DRC、3D 预览和制造预览。
+5. 将 BOM、CPL、Gerber ZIP 放入项目的 `easyeda/exports/`，运行 `validate_export.py` 后进入打样或 SMT 下单页面。
 
 可选的 `extensions/jlc-eda-pro-companion/` 提供 EasyEDA Pro 自动布线和布线前检查，复用 KiCadRoutingTools 的 A* 引擎。它默认保留已有铜箔，完成后仍需在 EasyEDA Pro 中执行 DRC。
 

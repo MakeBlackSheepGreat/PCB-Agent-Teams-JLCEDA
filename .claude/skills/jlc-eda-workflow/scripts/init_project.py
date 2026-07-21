@@ -24,8 +24,11 @@ def create_project(name: str, goal: str, projects_root: Path) -> Path:
 
     project_dir.mkdir(parents=True)
     for directory in (
+        "kicad",
         "easyeda/source",
         "easyeda/exports",
+        "constraints",
+        "handoff",
         "datasheets",
         "reference_designs",
         "docs",
@@ -40,11 +43,14 @@ def create_project(name: str, goal: str, projects_root: Path) -> Path:
     for source_name, target_name in (
         ("PROJECT.md.tmpl", "PROJECT.md"),
         ("STATUS.md.tmpl", "STATUS.md"),
+        ("board_constraints.json.tmpl", "constraints/board_constraints.json"),
     ):
         content = (template_dir / source_name).read_text(encoding="utf-8")
         for marker, value in replacements.items():
             content = content.replace(marker, value)
-        (project_dir / target_name).write_text(content, encoding="utf-8")
+        target = project_dir / target_name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
 
     shutil.copyfile(template_dir / "project.gitignore", project_dir / ".gitignore")
     return project_dir
